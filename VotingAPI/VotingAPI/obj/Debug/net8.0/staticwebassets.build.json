@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "PghN+uaps6896kD1vqwQCUeGjEAuusBP5OyKZdqAGpA=",
+  "Source": "VotingAPI",
+  "BasePath": "_content/VotingAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

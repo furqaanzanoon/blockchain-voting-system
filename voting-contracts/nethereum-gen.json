@@ -1,0 +1,20 @@
+[
+  {
+    "paths": [
+      "./artifacts/contracts/core/BallotFactory.sol/BallotFactory.json",
+      "./artifacts/contracts/core/Voting.sol/Voting.json",
+      "./artifacts/contracts/core/VoterRegistry.sol/VoterRegistry.json",
+      "./artifacts/contracts/core/ResultAggregator.sol/ResultAggregator.json",
+      "./artifacts/contracts/security/ZKVerifier.sol/ZKVerifier.json",
+      "./artifacts/contracts/security/AccessControl.sol/AccessControl.json"
+    ],
+    "generatorConfigs": [
+      {
+        "baseNamespace": "VotingAPI.Services.Blockchain.Generated",
+        "basePath": "../VotingAPI/VotingAPI/Services/Blockchain/Generated",
+        "codeGenLang": 0,
+        "generatorType": "ContractDefinition"
+      }
+    ]
+  }
+]
