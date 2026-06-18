@@ -37,6 +37,17 @@ builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompre
     options.Level = System.IO.Compression.CompressionLevel.Fastest;
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.SetIsOriginAllowed(origin => true)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers();
 
 // Forces all API routes (like [controller]) to generate as lowercase URLs globally
@@ -119,6 +130,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("CorsPolicy");
 
 app.UseResponseCompression();
 app.UseHttpsRedirection();
