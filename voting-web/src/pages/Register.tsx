@@ -127,9 +127,9 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-slate-950">
-      <div className="w-[500px] bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl">
-        <h1 className="text-4xl font-bold text-center text-cyan-400 mb-8">
+    <div className="min-h-screen flex justify-center items-center bg-slate-950 px-4">
+      <div className="w-full max-w-[500px] bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center text-cyan-400 mb-8">
           Create Account
         </h1>
 

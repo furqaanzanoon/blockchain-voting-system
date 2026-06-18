@@ -18,6 +18,8 @@ import {
   FaKey,
   FaCheckCircle,
   FaFlag,
+  FaBars,
+  FaTimes,
 } from "react-icons/fa";
 
 const Elections = React.lazy(() => import("./Elections"));
@@ -55,6 +57,13 @@ export default function Dashboard() {
     useState<DashboardPage>(
       "elections"
     );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handlePageChange = (p: DashboardPage) => {
+    setPage(p);
+    setIsSidebarOpen(false);
+  };
+
   const [visitedPages, setVisitedPages] = useState<Set<string>>(new Set(["elections"]));
 
   useEffect(() => {
@@ -384,184 +393,226 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-white">
-      <div className="w-72 bg-slate-900 border-r border-slate-800 p-6">
-        <h1 className="text-5xl font-bold mb-6 text-cyan-400">
-          BVS
-        </h1>
-
-        <div className="bg-slate-800 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <FaUser className="text-cyan-400" />
-
-            <div>
-              <p className="text-sm text-slate-400">
-                Logged in as
-              </p>
-
-              <p className="font-semibold">
-                {userName}
-              </p>
-
-              <p className="text-xs text-cyan-400">
-                {role}
-              </p>
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-slate-950 text-white relative">
+      {/* Mobile Top Header */}
+      <div className="md:hidden flex items-center justify-between bg-slate-900 border-b border-slate-800 px-6 py-4 fixed top-0 left-0 right-0 z-30">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="text-slate-400 hover:text-white focus:outline-none transition-colors"
+          >
+            <FaBars size={24} />
+          </button>
+          <span className="text-2xl font-bold text-cyan-400">BVS</span>
         </div>
 
-        <div className="space-y-3">
-          <button
-            onClick={() =>
-              setPage("elections")
-            }
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-          >
-            <FaUniversity />
-            Elections
-          </button>
-
-          <button
-            onClick={() =>
-              setPage("candidates")
-            }
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-          >
-            <FaUsers />
-            Candidates
-          </button>
-
-          {(role === "Admin" ||
-            role ===
-              "ElectionOfficer") && (
-            <button
-              onClick={() =>
-                setPage("voters")
-              }
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-            >
-              <FaUsers />
-              Voters
-            </button>
-          )}
-          {(role === "Admin" ||
-            role ===
-              "ElectionOfficer") && (
-            <button
-              onClick={() =>
-                setPage("parties")
-              }
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-            >
-              <FaFlag />
-              Parties
-            </button>
-          )}
-          {(role === "Admin" ||
-            role === "ElectionOfficer" ||
-            role === "Party") && (
-            <button
-              onClick={() =>
-                setPage("pending-users")
-              }
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-            >
-              <FaCheckCircle />
-              Verification
-            </button>
-          )}
-
-          {role === "Voter" && (
-            <button
-              onClick={() =>
-                setPage("vote")
-              }
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-            >
-              <FaVoteYea />
-              Voting
-            </button>
-          )}
-
-          <button
-            onClick={() =>
-              setPage("results")
-            }
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-          >
-            <FaChartBar />
-            Results
-          </button>
-
-          {role === "Admin" && (
-            <button
-              onClick={() =>
-                setPage("officers")
-              }
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-            >
-              <FaUserShield />
-              Officers
-            </button>
-          )}
-
-          {role === "Voter" && (
-            <>
-              {!wallet ? (
-                <button
-                  onClick={connect}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-500 text-black font-bold"
-                >
-                  <FaWallet />
-                  Connect Wallet
-                </button>
-              ) : (
-                <button
-                  onClick={
-                    disconnectWallet
-                  }
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-500 text-black font-bold"
-                >
-                  <FaWallet />
-                  Disconnect Wallet
-                </button>
-              )}
-            </>
-          )}
-
-          <button
-            onClick={() =>
-              setPage("change-password")
-            }
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black"
-          >
-            <FaKey />
-            Change Password
-          </button>
-
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold"
-          >
-            <FaSignOutAlt />
-            Logout
-          </button>
-
-          {role === "Voter" && wallet && (
-            <div className="mt-4 bg-slate-800 p-3 rounded-xl">
-              <p className="text-green-400 text-xs font-bold">
-                Wallet Connected
-              </p>
-
-              <p className="text-slate-300 text-xs break-all mt-1">
-                {wallet}
-              </p>
-            </div>
-          )}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400 font-semibold bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700/50">
+            {role}
+          </span>
         </div>
       </div>
 
-      <div className="flex-1 p-8">
+      {/* Sidebar Backdrop for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Drawer */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 p-6 flex flex-col justify-between transition-transform duration-300 md:relative md:translate-x-0 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-5xl font-bold text-cyan-400">
+              BVS
+            </h1>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition"
+            >
+              <FaTimes size={24} />
+            </button>
+          </div>
+
+          <div className="bg-slate-800 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <FaUser className="text-cyan-400" />
+
+              <div>
+                <p className="text-sm text-slate-400">
+                  Logged in as
+                </p>
+
+                <p className="font-semibold">
+                  {userName}
+                </p>
+
+                <p className="text-xs text-cyan-400">
+                  {role}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={() =>
+                handlePageChange("elections")
+              }
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+            >
+              <FaUniversity />
+              Elections
+            </button>
+
+            <button
+              onClick={() =>
+                handlePageChange("candidates")
+              }
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+            >
+              <FaUsers />
+              Candidates
+            </button>
+
+            {(role === "Admin" ||
+              role ===
+                "ElectionOfficer") && (
+              <button
+                onClick={() =>
+                  handlePageChange("voters")
+                }
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+              >
+                <FaUsers />
+                Voters
+              </button>
+            )}
+            {(role === "Admin" ||
+              role ===
+                "ElectionOfficer") && (
+              <button
+                onClick={() =>
+                  handlePageChange("parties")
+                }
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+              >
+                <FaFlag />
+                Parties
+              </button>
+            )}
+            {(role === "Admin" ||
+              role === "ElectionOfficer" ||
+              role === "Party") && (
+              <button
+                onClick={() =>
+                  handlePageChange("pending-users")
+                }
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+              >
+                <FaCheckCircle />
+                Verification
+              </button>
+            )}
+
+            {role === "Voter" && (
+              <button
+                onClick={() =>
+                  handlePageChange("vote")
+                }
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+              >
+                <FaVoteYea />
+                Voting
+              </button>
+            )}
+
+            <button
+              onClick={() =>
+                handlePageChange("results")
+              }
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+            >
+              <FaChartBar />
+              Results
+            </button>
+
+            {role === "Admin" && (
+              <button
+                onClick={() =>
+                  handlePageChange("officers")
+                }
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+              >
+                <FaUserShield />
+                Officers
+              </button>
+            )}
+
+            {role === "Voter" && (
+              <>
+                {!wallet ? (
+                  <button
+                    onClick={connect}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-500 text-black font-bold transition duration-200"
+                  >
+                    <FaWallet />
+                    Connect Wallet
+                  </button>
+                ) : (
+                  <button
+                    onClick={
+                      disconnectWallet
+                    }
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-500 text-black font-bold transition duration-200"
+                  >
+                    <FaWallet />
+                    Disconnect Wallet
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={() =>
+                handlePageChange("change-password")
+              }
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-black transition duration-200"
+            >
+              <FaKey />
+              Change Password
+            </button>
+
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold transition duration-200"
+            >
+              <FaSignOutAlt />
+              Logout
+            </button>
+
+            {role === "Voter" && wallet && (
+              <div className="mt-4 bg-slate-800 p-3 rounded-xl border border-slate-700/50">
+                <p className="text-green-400 text-xs font-bold">
+                  Wallet Connected
+                </p>
+
+                <p className="text-slate-300 text-xs break-all mt-1 font-mono">
+                  {wallet}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 p-4 pt-20 sm:p-6 sm:pt-20 md:p-8 md:pt-8 transition-all duration-300">
         <div className="grid gap-5 mb-8 md:grid-cols-2 xl:grid-cols-4">
           <div className="bg-slate-900 rounded-2xl p-5">
             <h3 className="text-slate-400">
