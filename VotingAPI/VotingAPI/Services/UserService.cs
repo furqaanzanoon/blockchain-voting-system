@@ -36,8 +36,8 @@ namespace VotingAPI.Services
 
         public async Task<List<UserResponseDTO>> GetAllUsers()
         {
-            // Fetches only users (voters), not admins, election officers, and parties
-            var usersRoles = await dbContext.Users.AsNoTracking().Where(u => u.Role == UserRole.Voter).Select(u => new UserResponseDTO
+            // Fetches only verified and approved voters
+            var usersRoles = await dbContext.Users.AsNoTracking().Where(u => u.Role == UserRole.Voter && u.IsVerified && u.IsApproved).Select(u => new UserResponseDTO
             {
                 UserId = u.UserId,
                 FullName = u.FullName,
@@ -193,7 +193,7 @@ namespace VotingAPI.Services
         public async Task<List<UserResponseDTO>> GetParties()
         {
             return await dbContext.Users.AsNoTracking()
-                .Where(u => u.Role == UserRole.Party)
+                .Where(u => u.Role == UserRole.Party && u.IsVerified)
                 .Select(u => new UserResponseDTO
                 {
                     UserId = u.UserId,
@@ -225,7 +225,7 @@ namespace VotingAPI.Services
         public async Task<List<UserResponseDTO>> GetCandidates()
         {
             return await dbContext.Users.AsNoTracking()
-                .Where(u => u.Role == UserRole.Candidate)
+                .Where(u => u.Role == UserRole.Candidate && u.IsVerified)
                 .Select(u => new UserResponseDTO
                 {
                     UserId = u.UserId,
