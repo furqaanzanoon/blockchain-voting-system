@@ -453,7 +453,6 @@ export default function Vote() {
 
       // Fetch voter nonce from backend
       const nonceRes = await api.get(`/vote/nonce/${selectedElection}`);
-      const nonce = nonceRes.data.nonce;
       const registeredAddress = nonceRes.data.registeredAddress;
 
       if (registeredAddress && voterAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
