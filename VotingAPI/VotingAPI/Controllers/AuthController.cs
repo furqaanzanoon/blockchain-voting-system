@@ -9,10 +9,12 @@ namespace VotingAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService authService;
+        private readonly IWebHostEnvironment env;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IWebHostEnvironment env)
         {
             this.authService = authService;
+            this.env = env;
         }
 
         [HttpPost("register")]
@@ -38,7 +40,7 @@ namespace VotingAPI.Controllers
             Response.Cookies.Append(key: "access_token", value: token, options: new CookieOptions
             {
                 HttpOnly = true,
-                Secure = false,
+                Secure = !env.IsDevelopment(), // Secure=true in production (HTTPS only)
                 SameSite = SameSiteMode.Lax,
                 Expires = DateTime.UtcNow.AddDays(1)
             });

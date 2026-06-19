@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Reflection.Metadata.Ecma335;
 using System.Security.Claims;
 using VotingAPI.Models.DTOs.Election;
 using VotingAPI.Models.Enums;

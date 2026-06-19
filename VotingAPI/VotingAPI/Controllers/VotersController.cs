@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VotingAPI.Models.DTOs.Voter;
 using VotingAPI.Models.Enums;
@@ -19,9 +19,9 @@ namespace VotingAPI.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register(Guid ElectionId, Guid UserId)
+        public async Task<IActionResult> Register([FromBody] RegisterVoterDTO dto)
         {
-            var result = await voterService.RegisterVoter(ElectionId, UserId);
+            var result = await voterService.RegisterVoter(dto.ElectionId, dto.UserId);
             return Ok(new { message = result });
         }
 

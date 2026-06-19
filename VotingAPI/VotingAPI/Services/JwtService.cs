@@ -32,7 +32,8 @@ namespace VotingAPI.Services
 
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var token = new JwtSecurityToken(issuer: configuration["Jwt:Issuer"], audience: configuration["Jwt:Audience"], claims: claims, notBefore: null, expires: DateTime.UtcNow.AddDays(1), signingCredentials: credentials);
+            var expireDays = double.TryParse(configuration["Jwt:ExpireDays"], out var d) ? d : 1;
+            var token = new JwtSecurityToken(issuer: configuration["Jwt:Issuer"], audience: configuration["Jwt:Audience"], claims: claims, notBefore: null, expires: DateTime.UtcNow.AddDays(expireDays), signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

@@ -30,7 +30,8 @@ namespace VotingAPI.Middleware
                     ArgumentException => 400,
                     UnauthorizedAccessException => 401,
                     KeyNotFoundException => 404,
-                    InvalidOperationException => 409,
+                    InvalidOperationException => 400,    // Business rule violations (e.g. "Already voted", "Election not active")
+                    NotImplementedException => 501,
                     _ => 500,
                 };
 

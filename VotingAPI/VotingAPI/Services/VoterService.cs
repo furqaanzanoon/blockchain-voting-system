@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography.Xml;
 using VotingAPI.Data;
 using VotingAPI.Models.DTOs.Voter;
 using VotingAPI.Models.Entities;
@@ -12,12 +10,10 @@ namespace VotingAPI.Services
     public class VoterService : IVoterService
     {
         private readonly VotingDbContext dbContext;
-        private readonly IBlockchainService blockchainService;
 
-        public VoterService(VotingDbContext dbContext, IBlockchainService blockchainService)
+        public VoterService(VotingDbContext dbContext)
         {
             this.dbContext = dbContext;
-            this.blockchainService = blockchainService;
         }
 
         public async Task<string> RegisterVoter(Guid ElectionId, Guid UserId)

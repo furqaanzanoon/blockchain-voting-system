@@ -25,7 +25,8 @@ namespace VotingAPI.Data
 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.EthAddress)
-                .IsUnique(); // Ensure Ethereum address uniqueness at the database level (if provided)
+                .IsUnique()
+                .HasFilter("[EthAddress] IS NOT NULL"); // Allow multiple NULLs (users without a connected wallet)
 
             // User → Elections (created by this user)
             modelBuilder.Entity<User>()

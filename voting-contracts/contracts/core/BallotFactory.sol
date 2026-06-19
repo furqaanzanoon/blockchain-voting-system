@@ -40,6 +40,8 @@ contract BallotFactory {
         string memory _title,
         string[] memory _candidateNames
     ) external returns (uint256) {
+        require(_candidateNames.length >= 2, "At least 2 candidates required");
+
         Voting newVoting = new Voting(registryAddress, zkVerifierAddress);
 
         uint256 len = _candidateNames.length;

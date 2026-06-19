@@ -88,11 +88,11 @@ contract Voting {
         emit VotingEnded();
     }
 
-    // ─── Standard vote ───────────────────────────────────────
+    // ─── Standard vote (only owner/admin wallet can submit on behalf of a voter) ──
     function vote(
         address voter,
         uint256 _candidateId
-    ) external whenOpen {
+    ) external onlyOwner whenOpen {
         _executeVote(voter, _candidateId);
     }
 
@@ -191,11 +191,13 @@ contract Voting {
             if (v > topVotes) {
                 topVotes = v;
                 count = 1;
-            } else if (v == topVotes) {
+            } else if (v == topVotes && v > 0) {
                 count++;
             }
             unchecked { i++; }
         }
+
+        require(topVotes > 0, "No votes cast yet");
 
         winnerIds = new uint256[](count);
         winnerNames = new string[](count);

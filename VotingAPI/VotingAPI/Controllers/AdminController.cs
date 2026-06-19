@@ -22,7 +22,7 @@ namespace VotingAPI.Controllers
         public async Task<IActionResult> CreateOfficer(CreateOfficerDTO dto)
         {
             var result = await adminService.CreateOfficer(dto);
-            return Ok(new { messsage = result });
+            return Ok(new { message = result });
         }
 
         [HttpGet("officers")]

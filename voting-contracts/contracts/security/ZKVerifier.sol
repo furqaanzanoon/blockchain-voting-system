@@ -68,7 +68,7 @@ contract ZKVerifier {
     // ─── Constructor ─────────────────────────────────────────
     constructor() {
         owner = msg.sender;
-        vkSet = true;
+        vkSet = false; // Key must be set explicitly via setVerifyingKey() before any verification
     }
 
     // ─── Setup ───────────────────────────────────────────────
@@ -157,8 +157,30 @@ contract ZKVerifier {
         Proof         memory proof,
         PublicSignals memory signals
     ) internal view returns (bool) {
-        // Return true to verify mock proofs on-chain without native circom dependencies during deployment
-        return true;
+        require(vk.ic.length >= 2, "VK not initialized");
+
+        // Compute the linear combination: vk_x = vk.ic[0] + sum(signals[i] * vk.ic[i+1])
+        G1Point memory vk_x = vk.ic[0];
+        uint256[4] memory sigArr = [
+            signals.merkleRoot,
+            signals.nullifierHash,
+            signals.ballotId,
+            signals.voteCommitment
+        ];
+        for (uint256 i = 0; i < sigArr.length;) {
+            require(sigArr[i] < PRIME_Q, "Signal out of range");
+            vk_x = _add(vk_x, _scalar_mul(vk.ic[i + 1], sigArr[i]));
+            unchecked { i++; }
+        }
+
+        // Groth16 pairing check:
+        // e(proof.A, proof.B) * e(-vk.alpha1, vk.beta2) * e(-vk_x, vk.gamma2) * e(-proof.C, vk.delta2) == 1
+        return _pairingCheck(
+            _negate(proof.a), proof.b,
+            _negate(vk.alpha1), vk.beta2,
+            _negate(vk_x), vk.gamma2,
+            _negate(proof.c), vk.delta2
+        );
     }
 
     function _add(G1Point memory p1, G1Point memory p2)

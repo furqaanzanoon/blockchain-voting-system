@@ -46,7 +46,7 @@ namespace VotingAPI.Services
                             AutoActivateFailReason = x.Election.AutoActivateFailReason,
                             AutoClose = x.Election.AutoClose,
                             HasVoted = voter != null && voter.HasVoted,
-                            CandidateCount = x.Election.Candidates.Count,
+                            CandidateCount = dbContext.Candidates.Count(c => c.ElectionId == x.Election.ElectionId && c.IsApproved),
                             ContractAddress = x.Election.ContractAddress
                         })
                     .ToListAsync();
@@ -65,7 +65,7 @@ namespace VotingAPI.Services
                     AutoActivateFailReason = e.AutoActivateFailReason,
                     AutoClose = e.AutoClose,
                     HasVoted = false,
-                    CandidateCount = e.Candidates.Count,
+                    CandidateCount = dbContext.Candidates.Count(c => c.ElectionId == e.ElectionId && c.IsApproved),
                     ContractAddress = e.ContractAddress
                 }).ToListAsync();
             }

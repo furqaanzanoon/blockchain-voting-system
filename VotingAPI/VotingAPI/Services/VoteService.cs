@@ -62,23 +62,34 @@ namespace VotingAPI.Services
                 votePrepareRequestDTO.Signature
             );
 
-            // Record the vote in the database
+            // Record the vote in the database inside a transaction to ensure consistency
             var voter = await dbContext.Voters.FirstOrDefaultAsync(v => v.UserId == userId && v.ElectionId == votePrepareRequestDTO.ElectionId) ?? throw new KeyNotFoundException("Voter not found");
 
+            var votedAt = DateTime.UtcNow;
             var voteTransaction = new VoteTransaction
             {
                 TxHash = txHash,
                 BlockNumber = blockNumber,
-                VotedAt = DateTime.UtcNow,
+                VotedAt = votedAt,
                 ElectionId = votePrepareRequestDTO.ElectionId,
                 CandidateId = votePrepareRequestDTO.CandidateId
             };
 
-            voter.HasVoted = true;
-            voter.TxHash = txHash;
-            voter.BlockNumber = blockNumber;
-            await dbContext.VoteTransactions.AddAsync(voteTransaction);
-            await dbContext.SaveChangesAsync();
+            using var dbTransaction = await dbContext.Database.BeginTransactionAsync();
+            try
+            {
+                voter.HasVoted = true;
+                voter.TxHash = txHash;
+                voter.BlockNumber = blockNumber;
+                await dbContext.VoteTransactions.AddAsync(voteTransaction);
+                await dbContext.SaveChangesAsync();
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
 
             return new VotePrepareResponseDTO
             {
@@ -111,11 +122,15 @@ namespace VotingAPI.Services
             if (voter == null || !voter.HasVoted || string.IsNullOrEmpty(voter.TxHash))
                 return null;
 
+            // Use the actual vote timestamp from the VoteTransaction table (not registration time)
+            var voteTransaction = await dbContext.VoteTransactions
+                .FirstOrDefaultAsync(vt => vt.TxHash == voter.TxHash && vt.ElectionId == electionId);
+
             return new VoteReceiptDTO
             {
                 TxHash = voter.TxHash,
                 BlockNumber = voter.BlockNumber,
-                VotedAt = voter.RegisteredAt,
+                VotedAt = voteTransaction?.VotedAt ?? voter.RegisteredAt,
                 CandidateName = "Anonymous (Ballot Secret)",
                 ElectionTitle = voter.Election.Title,
                 ContractAddress = voter.Election.ContractAddress ?? string.Empty

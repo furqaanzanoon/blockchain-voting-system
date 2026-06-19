@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 
 namespace VotingAPI.Helpers
 {
@@ -9,7 +9,7 @@ namespace VotingAPI.Helpers
             return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
         }
 
-        public static string GetBody(string userName, string otp)
+        public static string GetBody(string userName, string otp, int validMinutes = 10)
         {
             return $@"
 <!DOCTYPE html> 
@@ -52,7 +52,7 @@ namespace VotingAPI.Helpers
                         <h4 style=""margin: 0 0 8px 0; color: #b45309; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;"">                        
                             Important Information                    </h4>                    
                         <p style=""margin: 0; font-size: 14px; line-height: 1.4; color: #78350f;"">                        
-                            This code is valid for <strong>10 minutes</strong> from the time it was requested.                    
+                            This code is valid for <strong>{validMinutes} minutes</strong> from the time it was requested.                    
                         </p>                
                     </div>                            
                 </td>        
