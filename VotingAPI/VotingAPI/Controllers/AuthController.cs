@@ -41,7 +41,7 @@ namespace VotingAPI.Controllers
             {
                 HttpOnly = true,
                 Secure = !env.IsDevelopment(), // Secure=true in production (HTTPS only)
-                SameSite = SameSiteMode.Lax,
+                SameSite = env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddDays(1)
             });
 

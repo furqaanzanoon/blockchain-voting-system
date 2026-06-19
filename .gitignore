@@ -1,8 +1,8 @@
 # ─── .NET / Visual Studio ────────────────────────────────────────────────────
 
-## Build outputs
-VotingAPI/VotingAPI/bin/
-VotingAPI/VotingAPI/obj/
+## Build artifacts — never commit these
+**/bin/
+**/obj/
 
 ## Publish output
 VotingAPI/VotingAPI/publish/

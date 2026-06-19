@@ -25,6 +25,10 @@ builder.Services.AddScoped<IResultService, ResultService>();
 
 builder.Services.AddHostedService<ElectionAutoActivateService>();
 
+builder.Services.AddHealthChecks()
+    .AddCheck<DbHealthCheck>("Database");
+builder.Services.AddHostedService<KeepAliveService>();
+
 builder.Services.AddMemoryCache();
 builder.Services.AddResponseCompression(options =>
 {
@@ -142,6 +146,7 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
+app.MapHealthChecks("/api/health");
 app.MapControllers();
 
 app.Run();

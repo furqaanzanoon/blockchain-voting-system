@@ -190,9 +190,10 @@ export default function Voters() {
     try {
       setLoading(true);
 
-      await api.post(
-        `/voters/register?ElectionId=${selectedElection}&UserId=${selectedUser}`
-      );
+      await api.post("/voters/register", {
+        electionId: selectedElection,
+        userId: selectedUser,
+      });
 
       showToast(
         "Voter registered to election successfully",
