@@ -1,10 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
 import api from "../services/api";
-// @ts-ignore
-import * as snarkjs from "snarkjs";
-// @ts-ignore
-import { buildPoseidon } from "circomlibjs";
 import {
   FaVoteYea,
   FaUserTie,
@@ -43,7 +39,6 @@ interface VoteReceipt {
   contractAddress: string;
 }
 
-
 const normalizeElection = (e: any): Election => ({
   electionId: e.electionId ?? e.ElectionId ?? "",
   title: e.title ?? e.Title ?? "",
@@ -54,29 +49,18 @@ const normalizeElection = (e: any): Election => ({
 });
 
 export default function Vote() {
-  const [candidates, setCandidates] =
-    useState<Candidate[]>([]);
-  const [elections, setElections] =
-    useState<Election[]>([]);
-  const [selectedElection, setSelectedElection] =
-    useState("");
-  const [loadingCandidateId, setLoadingCandidateId] =
-    useState("");
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [elections, setElections] = useState<Election[]>([]);
+  const [selectedElection, setSelectedElection] = useState("");
+  const [loadingCandidateId, setLoadingCandidateId] = useState("");
 
   const { showToast } = useToast();
-  const [sendingOtpCandidateId, setSendingOtpCandidateId] =
-    useState("");
-  const [pendingVoteCandidateId, setPendingVoteCandidateId] =
-    useState("");
+  const [sendingOtpCandidateId, setSendingOtpCandidateId] = useState("");
+  const [pendingVoteCandidateId, setPendingVoteCandidateId] = useState("");
   const [otp, setOtp] = useState("");
   const [activeVoiceCandidateId, setActiveVoiceCandidateId] = useState("");
   const [voteReceipt, setVoteReceipt] = useState<VoteReceipt | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
-
-  const [commitments, setCommitments] = useState<string[]>([]);
-  const [voterKeys, setVoterKeys] = useState<{ secret: string; salt: string; commitment: string } | null>(null);
-  const [registeringCommitment, setRegisteringCommitment] = useState(false);
-  const [generatingKeys, setGeneratingKeys] = useState(false);
 
   const handleVoiceCancel = () => {
     setActiveVoiceCandidateId("");
@@ -235,47 +219,14 @@ export default function Vote() {
 
   useEffect(() => {
     if (selectedElection) {
-      const initWalletAndKeys = async () => {
-        loadCandidates(selectedElection);
-        loadCommitments(selectedElection);
-        setVoterKeys(null);
-
-        if (!window.ethereum) return;
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const accounts = await provider.send("eth_accounts", []);
-          if (accounts.length > 0) {
-            const userId = localStorage.getItem("userId") || "";
-            const saved = sessionStorage.getItem(`voter_keys_${userId}_${selectedElection}`);
-            if (saved) {
-              setVoterKeys(JSON.parse(saved));
-            }
-          }
-        } catch (err) {
-          console.error("Auto wallet/key initialization failed:", err);
-        }
-      };
-
-      initWalletAndKeys();
+      loadCandidates(selectedElection);
     }
   }, [selectedElection]);
 
-  const loadCommitments = async (electionId: string) => {
-    try {
-      const res = await api.get(`/vote/commitments/${electionId}`);
-      setCommitments(res.data);
-    } catch (err) {
-      console.error("Failed to load commitments:", err);
-      setCommitments([]);
-    }
-  };
-
   const loadElections = async () => {
     try {
-      const res =
-        await api.get("/elections");
-      const allElections: Election[] =
-        (res.data.elections ?? []).map(normalizeElection);
+      const res = await api.get("/elections");
+      const allElections: Election[] = (res.data.elections ?? []).map(normalizeElection);
 
       // Show active or draft elections whose closing time has not passed
       const list = allElections.filter((e) => {
@@ -291,9 +242,7 @@ export default function Vote() {
       setElections(list);
 
       if (list.length > 0) {
-        setSelectedElection(
-          list[0].electionId
-        );
+        setSelectedElection(list[0].electionId);
       } else {
         setSelectedElection("");
         setCandidates([]);
@@ -303,14 +252,9 @@ export default function Vote() {
     }
   };
 
-  const loadCandidates = async (
-    electionId: string
-  ) => {
+  const loadCandidates = async (electionId: string) => {
     try {
-      const res = await api.get(
-        `/elections/${electionId}/candidates`
-      );
-
+      const res = await api.get(`/elections/${electionId}/candidates`);
       setCandidates(res.data);
     } catch (err) {
       console.error(err);
@@ -319,9 +263,7 @@ export default function Vote() {
   };
 
   // Check if the currently selected election has been voted
-  const currentElection = elections.find(
-    (e) => e.electionId === selectedElection
-  );
+  const currentElection = elections.find((e) => e.electionId === selectedElection);
   const hasVotedInSelected = currentElection?.hasVoted ?? false;
 
   // Fetch vote receipt when selecting an election the user has voted in
@@ -345,174 +287,35 @@ export default function Vote() {
     }
   };
 
-  const generateKeys = async (targetElectionId?: string, activeAddress?: string): Promise<{ secret: string; salt: string; commitment: string; } | null> => {
-    const electionId = targetElectionId || selectedElection;
-    try {
-      if (!window.ethereum) {
-        showToast("Please install MetaMask to generate keys.", "warning");
-        return null;
-      }
-      const currentElection = elections.find(e => e.electionId === electionId);
-      if (!currentElection) {
-        showToast("Please select an election first.", "warning");
-        return null;
-      }
-
-      setGeneratingKeys(true);
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const voterAddress = activeAddress || (await (await provider.getSigner()).getAddress());
-
-      // Auto-connect wallet to voter profile in database to ensure EthAddress is registered
-      try {
-        await api.post(`/users/connect-wallet?ethAddress=${encodeURIComponent(voterAddress)}`);
-      } catch (connErr) {
-        console.warn("Wallet auto-connection warning:", connErr);
-      }
-
-      // Check if registered address matches
-      const nonceRes = await api.get(`/vote/nonce/${electionId}`);
-      const registeredAddress = nonceRes.data.registeredAddress;
-
-      if (registeredAddress && voterAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
-        showToast(
-          `Your active MetaMask account (${voterAddress.slice(0, 6)}...${voterAddress.slice(-4)}) does not match your registered voting address (${registeredAddress.slice(0, 6)}...${registeredAddress.slice(-4)}). Please switch MetaMask to your registered account.`,
-          "error"
-        );
-        setGeneratingKeys(false);
-        return null;
-      }
-
-      showToast("Sign the message in MetaMask to derive your secure voting keys.", "info");
-      
-      const message = `Sign to generate your secure voting key for Election: ${currentElection.title}`;
-      const signature = await provider.send("personal_sign", [
-        ethers.hexlify(ethers.toUtf8Bytes(message)),
-        voterAddress
-      ]);
-
-      const sigHash = ethers.keccak256(signature);
-      const secretHash = ethers.keccak256(ethers.solidityPacked(["string", "string"], [sigHash, "secret"]));
-      const saltHash = ethers.keccak256(ethers.solidityPacked(["string", "string"], [sigHash, "salt"]));
-      const r = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
-      
-      const secret = (BigInt(secretHash) % r).toString();
-      const salt = (BigInt(saltHash) % r).toString();
-
-      // Calculate commitment
-      // @ts-ignore
-      const poseidon = await buildPoseidon();
-      const commitment = poseidon.F.toObject(poseidon([BigInt(secret), BigInt(salt)])).toString();
-
-      const keys = { secret, salt, commitment };
-      setVoterKeys(keys);
-
-      const userId = localStorage.getItem("userId") || "";
-      sessionStorage.setItem(`voter_keys_${userId}_${electionId}`, JSON.stringify(keys));
-
-      showToast("Keys generated successfully!", "success");
-      return keys;
-    } catch (err: any) {
-      console.error(err);
-      const isUserRejection = err?.code === 4001 || err?.code === "ACTION_REJECTED" || err?.message?.includes("user rejected") || err?.message?.includes("User denied");
-      showToast(isUserRejection ? "Signature request cancelled." : "Key generation failed.", isUserRejection ? "warning" : "error");
-      return null;
-    } finally {
-      setGeneratingKeys(false);
-    }
-  };
-
-  const generateAndRegisterKey = async () => {
-    try {
-      let keys = voterKeys;
-      if (!keys) {
-        keys = await generateKeys(selectedElection);
-      }
-      if (!keys) return;
-
-      setRegisteringCommitment(true);
-      await api.post("/vote/commitment", {
-        electionId: selectedElection,
-        commitment: keys.commitment
-      });
-      showToast("Security commitment registered successfully!", "success");
-      await loadCommitments(selectedElection);
-    } catch (err: any) {
-      console.error(err);
-      const isUserRejection = err?.code === 4001 || err?.code === "ACTION_REJECTED" || err?.message?.includes("user rejected") || err?.message?.includes("User denied");
-      showToast(isUserRejection ? "Registration cancelled." : "Registration failed.", isUserRejection ? "warning" : "error");
-    } finally {
-      setRegisteringCommitment(false);
-    }
-  };
-
   const requestVoteOtp = async (candidateId: string) => {
     try {
-      let keys = voterKeys;
-      if (!keys) {
-        keys = await generateKeys(selectedElection);
-      }
-      if (!keys) {
-        return;
-      }
-
-      // Check if commitment is in commitments list
-      if (!commitments.includes(keys.commitment)) {
-        showToast("Your security commitment is not registered in this election's voter list.", "error");
-        return;
-      }
-
       setSendingOtpCandidateId(candidateId);
-
-      await api.post(
-        "/vote/send-otp",
-        {
-          electionId: selectedElection,
-          candidateId,
-        }
-      );
-
+      await api.post("/vote/send-otp", {
+        electionId: selectedElection,
+        candidateId,
+      });
       setPendingVoteCandidateId(candidateId);
       setOtp("");
-
-      showToast(
-        "OTP sent to your registered email.",
-        "info"
-      );
+      showToast("OTP sent to your registered email.", "info");
     } catch (err: any) {
       console.error(err);
-
-      const message =
-        err?.response?.data?.message ||
-        "Failed to send vote OTP";
-
-      showToast(
-        message === "Not registered for election"
-          ? "You are not registered for this election. Ask an admin or election officer to register you before voting."
-          : message,
-        "error"
-      );
+      const message = err?.response?.data?.message || "Failed to send vote OTP";
+      showToast(message, "error");
     } finally {
       setSendingOtpCandidateId("");
     }
   };
 
   const castVote = async () => {
-    if (!pendingVoteCandidateId) {
-      return;
-    }
+    if (!pendingVoteCandidateId) return;
 
     try {
       if (!window.ethereum) {
-        showToast(
-          "Please install MetaMask to vote.",
-          "warning"
-        );
+        showToast("Please install MetaMask to vote.", "warning");
         return;
       }
 
-      setLoadingCandidateId(
-        pendingVoteCandidateId
-      );
+      setLoadingCandidateId(pendingVoteCandidateId);
 
       const currentElection = elections.find(e => e.electionId === selectedElection);
       if (!currentElection) {
@@ -553,7 +356,6 @@ export default function Vote() {
           network = await provider.getNetwork();
           chainId = Number(network.chainId);
         } catch (switchError: any) {
-          // This error code indicates that the chain has not been added to MetaMask.
           if (switchError.code === 4902) {
             try {
               await window.ethereum.request({
@@ -596,152 +398,57 @@ export default function Vote() {
 
       // Fetch voter nonce from backend
       const nonceRes = await api.get(`/vote/nonce/${selectedElection}`);
+      const nonce = nonceRes.data.nonce;
       const registeredAddress = nonceRes.data.registeredAddress;
 
       if (registeredAddress && voterAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
         showToast(
-          `Your active MetaMask account (${voterAddress.slice(0, 6)}...${voterAddress.slice(-4)}) does not match your registered voting address (${registeredAddress.slice(0, 6)}...${registeredAddress.slice(-4)}). Please switch MetaMask to your registered account.`,
+          `Your active MetaMask account does not match your registered voting address. Please switch MetaMask.`,
           "error"
         );
         return;
       }
 
-      if (!voterKeys) {
-        showToast("Please generate your secure voting key first.", "warning");
-        return;
-      }
-
-      const secret = voterKeys.secret;
-      const salt = voterKeys.salt;
-      const leafStr = voterKeys.commitment;
-
-      const commitmentsList = [...commitments];
-      if (!commitmentsList.includes(leafStr)) {
-        showToast("Your security commitment is not registered in this election's voter list.", "error");
-        return;
-      }
-
-      // Construct ZK proof inputs and signals using Poseidon and SnarkJS
-      showToast("Generating Zero-Knowledge proof locally in your browser. Please wait...", "info");
-
-      // @ts-ignore
-      const poseidon = await buildPoseidon();
-
-      // Pad commitments to 8 leaves
-      for (let i = commitmentsList.length; i < 8; i++) {
-        const dummyLeaf = poseidon.F.toObject(poseidon([BigInt(i), BigInt(i)])).toString();
-        commitmentsList.push(dummyLeaf);
-      }
-
-      // Compute tree levels
-      const level0 = commitmentsList.map(x => BigInt(x));
-      
-      const level1: bigint[] = [];
-      for (let i = 0; i < 8; i += 2) {
-        const hash = poseidon.F.toObject(poseidon([level0[i], level0[i+1]]));
-        level1.push(hash);
-      }
-
-      const level2: bigint[] = [];
-      for (let i = 0; i < 4; i += 2) {
-        const hash = poseidon.F.toObject(poseidon([level1[i], level1[i+1]]));
-        level2.push(hash);
-      }
-
-      const rootBigInt = poseidon.F.toObject(poseidon([level2[0], level2[1]]));
-      const merkleRoot = rootBigInt.toString();
-
-      // Compute sibling path for the voter's leaf index
-      const leafIndex = commitmentsList.indexOf(leafStr);
-      const pathElements: string[] = [];
-      const pathIndices: string[] = [];
-
-      // Level 0 sibling
-      const s0 = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
-      pathElements.push(level0[s0].toString());
-      pathIndices.push((leafIndex % 2).toString());
-
-      // Level 1 sibling
-      const p1 = Math.floor(leafIndex / 2);
-      const s1 = p1 % 2 === 0 ? p1 + 1 : p1 - 1;
-      pathElements.push(level1[s1].toString());
-      pathIndices.push((p1 % 2).toString());
-
-      // Level 2 sibling
-      const p2 = Math.floor(p1 / 2);
-      const s2 = p2 % 2 === 0 ? p2 + 1 : p2 - 1;
-      pathElements.push(level2[s2].toString());
-      pathIndices.push((p2 % 2).toString());
-
-      // Nullifier: Poseidon(secret, ballotId)
-      const ballotIdBigInt = BigInt(ethers.solidityPackedKeccak256(["string"], [selectedElection])) % BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
-      const ballotId = ballotIdBigInt.toString();
-
-      const nullifierHash = poseidon.F.toObject(poseidon([BigInt(secret), ballotIdBigInt])).toString();
-
-      // Vote commitment: Poseidon(candidateId, secret)
-      const candidateIdBigInt = BigInt(currentCandidate.onChainIndex ?? 0);
-      const voteCommitment = poseidon.F.toObject(poseidon([candidateIdBigInt, BigInt(secret)])).toString();
-
-      // Construct circuit inputs
-      const inputs = {
-        merkleRoot,
-        nullifierHash,
-        ballotId,
-        voteCommitment,
-        secret,
-        salt,
-        pathElements,
-        pathIndices,
-        candidateId: candidateIdBigInt.toString()
+      // EIP-712 structured signing parameters
+      const domain = {
+        name: "Decentralized Voting System",
+        version: "1.0.0",
+        chainId: chainId,
+        verifyingContract: currentElection.contractAddress
       };
 
-      console.log("Proving with inputs:", inputs);
-
-      // Generate the real Groth16 proof using snarkjs
-      // @ts-ignore
-      const { proof: fullProof, publicSignals } = await snarkjs.groth16.fullProve(
-        inputs,
-        "/vote.wasm",
-        "/vote_final.zkey"
-      );
-
-      console.log("Proof generated!", fullProof, publicSignals);
-
-      // Reformat fullProof to match expected API structure:
-      const proof = {
-        a: {
-          x: fullProof.pi_a[0],
-          y: fullProof.pi_a[1]
-        },
-        b: {
-          x: [fullProof.pi_b[0][1], fullProof.pi_b[0][0]],
-          y: [fullProof.pi_b[1][1], fullProof.pi_b[1][0]]
-        },
-        c: {
-          x: fullProof.pi_c[0],
-          y: fullProof.pi_c[1]
-        }
+      const types = {
+        Vote: [
+          { name: "voter", type: "address" },
+          { name: "candidateId", type: "uint256" },
+          { name: "nonce", type: "uint256" }
+        ]
       };
 
-      // Submit the vote via the ZK-SNARK pipeline
+      const value = {
+        voter: voterAddress,
+        candidateId: currentCandidate.onChainIndex,
+        nonce: nonce
+      };
+
+      showToast("Please sign the vote transaction in MetaMask.", "info");
+
+      const signature = await signer.signTypedData(domain, types, value);
+
+      showToast("Submitting your vote to the blockchain. Please wait...", "info");
+
+      // Submit EIP-712 structured signature to backend /api/vote/prepare
       const voteRes = await api.post(
-        "/vote/zk",
+        "/vote/prepare",
         {
           electionId: selectedElection,
           candidateId: pendingVoteCandidateId,
-          otp,
-          proof,
-          publicSignals: {
-            merkleRoot,
-            nullifierHash,
-            ballotId,
-            voteCommitment
-          }
+          otp: otp,
+          signature: signature,
+          nonce: nonce
         }
       );
 
-      // Extract receipt data from the response
       const responseData = voteRes.data;
       if (responseData?.txHash) {
         setVoteReceipt({
@@ -754,12 +461,8 @@ export default function Vote() {
         });
       }
 
-      showToast(
-        "Vote cast successfully! You can verify it on the blockchain.",
-        "success"
-      );
+      showToast("Vote cast successfully! Verified on-chain.", "success");
 
-      // Mark this election as voted in local state
       setElections((prev) =>
         prev.map((e) =>
           e.electionId === selectedElection
@@ -771,8 +474,6 @@ export default function Vote() {
       handleVoiceCancel();
     } catch (err: any) {
       console.error(err);
-
-      // Check if user rejected the MetaMask signature request
       const isUserRejection =
         err?.code === 4001 ||
         err?.code === "ACTION_REJECTED" ||
@@ -782,11 +483,7 @@ export default function Vote() {
       showToast(
         isUserRejection
           ? "Signature request was cancelled."
-          : err?.response?.data
-              ?.message ||
-            err?.shortMessage ||
-            err?.message ||
-            "Vote failed",
+          : err?.response?.data?.message || err?.shortMessage || err?.message || "Vote failed",
         isUserRejection ? "warning" : "error"
       );
     } finally {
@@ -794,23 +491,19 @@ export default function Vote() {
     }
   };
 
-  const submitVerifiedVote = async (
-    event: React.FormEvent
-  ) => {
+  const submitVerifiedVote = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
       await castVote();
     } catch {
-      // Error already handled in castVote
+      // Error already handled
     }
   };
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <h1 className="text-4xl font-bold">
-          Cast Your Vote
-        </h1>
+        <h1 className="text-4xl font-bold">Cast Your Vote</h1>
 
         <div className="flex items-center gap-3.5 bg-slate-900 border border-slate-750 rounded-2xl px-5 py-3 shadow-lg">
           <button
@@ -839,92 +532,31 @@ export default function Vote() {
 
       <div className="bg-slate-900 rounded-3xl p-6 mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <FaUniversity
-            className="text-cyan-400"
-            size={24}
-          />
-
-          <h2 className="text-xl font-bold">
-            Select Election
-          </h2>
+          <FaUniversity className="text-cyan-400" size={24} />
+          <h2 className="text-xl font-bold">Select Election</h2>
         </div>
 
         <select
           value={selectedElection}
-          onChange={(e) =>
-            setSelectedElection(
-              e.target.value
-            )
-          }
+          onChange={(e) => setSelectedElection(e.target.value)}
           className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3"
         >
           {elections.length === 0 && (
-            <option value="">
-              No active elections
+            <option value="">No active elections</option>
+          )}
+          {elections.map((election) => (
+            <option key={election.electionId} value={election.electionId}>
+              {election.title}
+              {election.hasVoted ? " (Voted)" : ""}
             </option>
-          )}
-          {elections.map(
-            (election) => (
-              <option
-                key={
-                  election.electionId
-                }
-                value={
-                  election.electionId
-                }
-              >
-                {election.title}
-                {election.hasVoted
-                  ? " (Voted)"
-                  : ""}
-              </option>
-            )
-          )}
+          ))}
         </select>
       </div>
-
-      {currentElection && normalizeStatus(currentElection.status) === "Draft" && (
-        <div className="bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-800 shadow-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <FaCheckCircle className="text-cyan-400" size={24} />
-            <h2 className="text-xl font-bold">Voter Registration (Draft Phase)</h2>
-          </div>
-          <p className="text-slate-300 text-sm mb-5">
-            This election is currently in the **Draft** phase. To be eligible to cast your vote when the election goes live, you must register your wallet.
-          </p>
-
-          {!voterKeys || !commitments.includes(voterKeys.commitment) ? (
-            <button
-              onClick={generateAndRegisterKey}
-              disabled={generatingKeys || registeringCommitment}
-              className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
-            >
-              {generatingKeys ? "Generating secure keys..." : registeringCommitment ? "Registering..." : "Register to Vote"}
-            </button>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
-                <FaCheckCircle />
-                Your registration is complete! Please wait for the voting phase to start.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {currentElection && normalizeStatus(currentElection.status) === "Active" && !hasVotedInSelected && voterKeys && !commitments.includes(voterKeys.commitment) && (
-        <div className="bg-red-500/15 border border-red-500/30 text-red-400 font-bold p-4 rounded-xl flex items-center gap-2 mb-8">
-          ⚠️ You did not register during the draft phase and are not eligible to vote in this election.
-        </div>
-      )}
 
       {hasVotedInSelected && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-3xl p-6 mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <FaCheckCircle
-              className="text-green-400"
-              size={28}
-            />
+            <FaCheckCircle className="text-green-400" size={28} />
             <div>
               <h3 className="text-lg font-bold text-green-400">
                 You have voted successfully in this election
@@ -1032,105 +664,74 @@ export default function Vote() {
       )}
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {candidates.map(
-          (candidate) => {
-            const isVoiceSelected = activeVoiceCandidateId === candidate.candidateId;
-            return (
-              <div
-                key={candidate.candidateId}
-                id={`candidate-card-${candidate.candidateId}`}
-                className={`bg-slate-900 rounded-3xl p-6 shadow-lg transition-all duration-300 relative ${
-                  isVoiceSelected
-                    ? "ring-4 ring-cyan-400 bg-slate-850 scale-[1.03] shadow-cyan-500/10"
-                    : "hover:scale-105"
-                }`}
-              >
-                {isVoiceSelected && (
-                  <span className="absolute top-4 right-4 bg-cyan-500 text-black text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
-                    Voice Selected
-                  </span>
-                )}
-                <div className="flex items-center gap-3 mb-4">
-                  <FaUserTie
-                    size={32}
-                    className="text-cyan-400"
-                  />
+        {candidates.map((candidate) => {
+          const isVoiceSelected = activeVoiceCandidateId === candidate.candidateId;
+          return (
+            <div
+              key={candidate.candidateId}
+              id={`candidate-card-${candidate.candidateId}`}
+              className={`bg-slate-900 rounded-3xl p-6 shadow-lg transition-all duration-300 relative ${
+                isVoiceSelected
+                  ? "ring-4 ring-cyan-400 bg-slate-850 scale-[1.03] shadow-cyan-500/10"
+                  : "hover:scale-105"
+              }`}
+            >
+              {isVoiceSelected && (
+                <span className="absolute top-4 right-4 bg-cyan-500 text-black text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
+                  Voice Selected
+                </span>
+              )}
+              <div className="flex items-center gap-3 mb-4">
+                <FaUserTie size={32} className="text-cyan-400" />
 
-                  <div>
-                    <h3 className="text-xl font-bold">
-                      {
-                        candidate.candidateName
-                      }
-                    </h3>
-
-                    <p className="text-slate-400">
-                      {candidate.partyAffiliation ||
-                        "Independent"}
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-bold">{candidate.candidateName}</h3>
+                  <p className="text-slate-400">{candidate.partyAffiliation || "Independent"}</p>
                 </div>
-
-                <p className="mb-4 text-slate-300">
-                  {candidate.description ||
-                    "No description provided."}
-                </p>
-
-                {hasVotedInSelected ? (
-                  <div className="w-full bg-green-500/15 border border-green-500/30 text-green-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
-                    <FaCheckCircle />
-                    Voted Successfully
-                  </div>
-                ) : currentElection && normalizeStatus(currentElection.status) === "Draft" ? (
-                  <button
-                    disabled
-                    className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
-                  >
-                    Election in Draft Phase
-                  </button>
-                ) : voterKeys && !commitments.includes(voterKeys.commitment) ? (
-                  <button
-                    disabled
-                    className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
-                  >
-                    Security Key Not Registered
-                  </button>
-                ) : (
-                  <button
-                    onClick={() =>
-                      requestVoteOtp(
-                        candidate.candidateId
-                      )
-                    }
-                    disabled={
-                      loadingCandidateId ===
-                        candidate.candidateId ||
-                      sendingOtpCandidateId ===
-                      candidate.candidateId
-                    }
-                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-                  >
-                    <FaVoteYea />
-                    {loadingCandidateId ===
-                    candidate.candidateId
-                      ? "Voting..."
-                      : sendingOtpCandidateId ===
-                        candidate.candidateId
-                      ? "Sending OTP..."
-                      : "Vote Now"}
-                  </button>
-                )}
               </div>
-            );
-          }
-        )}
+
+              <p className="mb-4 text-slate-300">
+                {candidate.description || "No description provided."}
+              </p>
+
+              {hasVotedInSelected ? (
+                <div className="w-full bg-green-500/15 border border-green-500/30 text-green-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+                  <FaCheckCircle />
+                  Voted Successfully
+                </div>
+              ) : currentElection && normalizeStatus(currentElection.status) === "Draft" ? (
+                <button
+                  disabled
+                  className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
+                >
+                  Election in Draft Phase
+                </button>
+              ) : (
+                <button
+                  onClick={() => requestVoteOtp(candidate.candidateId)}
+                  disabled={
+                    loadingCandidateId === candidate.candidateId ||
+                    sendingOtpCandidateId === candidate.candidateId
+                  }
+                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+                >
+                  <FaVoteYea />
+                  {loadingCandidateId === candidate.candidateId
+                    ? "Voting..."
+                    : sendingOtpCandidateId === candidate.candidateId
+                    ? "Sending OTP..."
+                    : "Vote Now"}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {pendingVoteCandidateId && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-6 z-50">
           <div className="w-full max-w-md bg-slate-900 rounded-3xl p-6 border border-slate-700 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-4 text-cyan-400">
-              Verify Vote OTP
-            </h2>
+            <h2 className="text-2xl font-bold mb-4 text-cyan-400">Verify Vote OTP</h2>
 
             <form onSubmit={submitVerifiedVote}>
               <input
@@ -1138,9 +739,7 @@ export default function Vote() {
                 required
                 placeholder="Enter OTP"
                 value={otp}
-                onChange={(e) =>
-                  setOtp(e.target.value)
-                }
+                onChange={(e) => setOtp(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 mb-4"
               />
 
@@ -1148,11 +747,7 @@ export default function Vote() {
                 <button
                   type="button"
                   onClick={handleVoiceCancel}
-                  disabled={
-                    Boolean(
-                      loadingCandidateId
-                    )
-                  }
+                  disabled={Boolean(loadingCandidateId)}
                   className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl"
                 >
                   Cancel
@@ -1160,16 +755,10 @@ export default function Vote() {
 
                 <button
                   type="submit"
-                  disabled={
-                    Boolean(
-                      loadingCandidateId
-                    )
-                  }
+                  disabled={Boolean(loadingCandidateId)}
                   className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 disabled:text-slate-300 text-black font-bold py-3 rounded-xl"
                 >
-                  {loadingCandidateId
-                    ? "Voting..."
-                    : "Verify & Vote"}
+                  {loadingCandidateId ? "Voting..." : "Verify & Vote"}
                 </button>
               </div>
             </form>
@@ -1185,4 +774,3 @@ export default function Vote() {
     </div>
   );
 }
-

@@ -3,8 +3,6 @@ import api from "../services/api";
 import { FaCalendarAlt } from "react-icons/fa";
 import { formatToIST } from "../utils/formatIST";
 import { useToast } from "../context/ToastContext";
-// @ts-ignore
-import { buildPoseidon } from "circomlibjs";
 
 interface Election {
   electionId: string;
@@ -127,42 +125,6 @@ export default function Elections() {
   ) => {
     try {
       setActivatingId(electionId);
-      
-      showToast("Fetching registered voter commitments...", "info");
-      const commitmentsRes = await api.get(`/vote/commitments/${electionId}`);
-      const commitments: string[] = commitmentsRes.data;
-
-      if (commitments.length === 0) {
-        showToast("Cannot activate election: No voters have registered security keys yet.", "error");
-        setActivatingId("");
-        return;
-      }
-
-      showToast("Generating Merkle tree and root...", "info");
-      // @ts-ignore
-      const poseidon = await buildPoseidon();
-      const leaves = [...commitments];
-      for (let i = leaves.length; i < 8; i++) {
-        const dummyLeaf = poseidon.F.toObject(poseidon([BigInt(i), BigInt(i)])).toString();
-        leaves.push(dummyLeaf);
-      }
-
-      const level0 = leaves.map(x => BigInt(x));
-      const level1: bigint[] = [];
-      for (let i = 0; i < 8; i += 2) {
-        level1.push(poseidon.F.toObject(poseidon([level0[i], level0[i+1]])));
-      }
-
-      const level2: bigint[] = [];
-      for (let i = 0; i < 4; i += 2) {
-        level2.push(poseidon.F.toObject(poseidon([level1[i], level1[i+1]])));
-      }
-
-      const rootBigInt = poseidon.F.toObject(poseidon([level2[0], level2[1]]));
-      const merkleRoot = rootBigInt.toString();
-
-      showToast("Saving Merkle root to database...", "info");
-      await api.post(`/elections/${electionId}/merkle-root`, { merkleRoot });
 
       showToast(
         "Deploying election to blockchain. This may take 1-2 minutes...",

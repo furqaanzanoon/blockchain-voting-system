@@ -126,6 +126,7 @@ namespace VotingAPI.Services
 
             // Use the actual vote timestamp from the VoteTransaction table (not registration time)
             var voteTransaction = await dbContext.VoteTransactions
+                .Include(vt => vt.Candidate)
                 .FirstOrDefaultAsync(vt => vt.TxHash == voter.TxHash && vt.ElectionId == electionId);
 
             return new VoteReceiptDTO
@@ -133,7 +134,7 @@ namespace VotingAPI.Services
                 TxHash = voter.TxHash,
                 BlockNumber = voter.BlockNumber,
                 VotedAt = voteTransaction?.VotedAt ?? voter.RegisteredAt,
-                CandidateName = "Anonymous (Ballot Secret)",
+                CandidateName = voteTransaction?.Candidate?.Name ?? "Unknown Candidate",
                 ElectionTitle = voter.Election.Title,
                 ContractAddress = voter.Election.ContractAddress ?? string.Empty
             };
