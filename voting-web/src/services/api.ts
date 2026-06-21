@@ -5,10 +5,21 @@ const api = axios.create({
   withCredentials: true, // Sends the HttpOnly access_token cookie on every request
 });
 
-// NOTE: No Authorization header is set here intentionally.
-// The backend authenticates via an HttpOnly cookie (access_token) which is
-// sent automatically by the browser with withCredentials: true.
-// Storing the JWT in localStorage and adding it to headers would be an XSS risk.
+// Send JWT token in Authorization header if present, as a fallback/primary auth method.
+// This ensures authentication works when hosted cross-domain online, since modern browsers
+// block third-party cookies (HttpOnly access_token cookie) from being sent.
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 api.interceptors.response.use(
   (response) => response,
