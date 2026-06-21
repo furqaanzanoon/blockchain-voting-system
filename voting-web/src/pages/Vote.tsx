@@ -477,17 +477,17 @@ export default function Vote() {
       const addressBigInt = BigInt(voterAddress);
 
       // Derive secret and salt deterministically from the wallet address
-      const secret = poseidon.F.toString(poseidon([addressBigInt, BigInt(1)]));
-      const salt = poseidon.F.toString(poseidon([addressBigInt, BigInt(2)]));
+      const secret = poseidon.F.toObject(poseidon([addressBigInt, BigInt(1)])).toString();
+      const salt = poseidon.F.toObject(poseidon([addressBigInt, BigInt(2)])).toString();
 
       // Calculate identity commitment: leaf = Poseidon(secret, salt)
-      const leafBigInt = poseidon([BigInt(secret), BigInt(salt)]);
-      const leafStr = poseidon.F.toString(leafBigInt);
+      const leafBigInt = poseidon.F.toObject(poseidon([BigInt(secret), BigInt(salt)]));
+      const leafStr = leafBigInt.toString();
 
       // Create a local Merkle tree of depth 3 (8 leaves)
       const leaves: string[] = [leafStr];
       for (let i = 1; i < 8; i++) {
-        const dummyLeaf = poseidon.F.toString(poseidon([BigInt(i), BigInt(i)]));
+        const dummyLeaf = poseidon.F.toObject(poseidon([BigInt(i), BigInt(i)])).toString();
         leaves.push(dummyLeaf);
       }
 
@@ -496,22 +496,24 @@ export default function Vote() {
       
       const level1: bigint[] = [];
       for (let i = 0; i < 8; i += 2) {
-        level1.push(poseidon([level0[i], level0[i+1]]));
+        const hash = poseidon.F.toObject(poseidon([level0[i], level0[i+1]]));
+        level1.push(hash);
       }
 
       const level2: bigint[] = [];
       for (let i = 0; i < 4; i += 2) {
-        level2.push(poseidon([level1[i], level1[i+1]]));
+        const hash = poseidon.F.toObject(poseidon([level1[i], level1[i+1]]));
+        level2.push(hash);
       }
 
-      const rootBigInt = poseidon([level2[0], level2[1]]);
-      const merkleRoot = poseidon.F.toString(rootBigInt);
+      const rootBigInt = poseidon.F.toObject(poseidon([level2[0], level2[1]]));
+      const merkleRoot = rootBigInt.toString();
 
       // Compute sibling path for leaf index 0 (indices = ["0", "0", "0"])
       const pathElements = [
-        poseidon.F.toString(level0[1]),
-        poseidon.F.toString(level1[1]),
-        poseidon.F.toString(level2[1])
+        level0[1].toString(),
+        level1[1].toString(),
+        level2[1].toString()
       ];
       const pathIndices = ["0", "0", "0"];
 
@@ -519,11 +521,11 @@ export default function Vote() {
       const ballotIdBigInt = BigInt(ethers.solidityPackedKeccak256(["string"], [selectedElection])) % BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
       const ballotId = ballotIdBigInt.toString();
 
-      const nullifierHash = poseidon.F.toString(poseidon([BigInt(secret), ballotIdBigInt]));
+      const nullifierHash = poseidon.F.toObject(poseidon([BigInt(secret), ballotIdBigInt])).toString();
 
       // Vote commitment: Poseidon(candidateId, secret)
       const candidateIdBigInt = BigInt(currentCandidate.onChainIndex ?? 0);
-      const voteCommitment = poseidon.F.toString(poseidon([candidateIdBigInt, BigInt(secret)]));
+      const voteCommitment = poseidon.F.toObject(poseidon([candidateIdBigInt, BigInt(secret)])).toString();
 
       // Construct circuit inputs
       const inputs = {
