@@ -13,7 +13,6 @@ import {
   FaMicrophone,
   FaMicrophoneSlash,
   FaExternalLinkAlt,
-  FaKey,
 } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
 import { normalizeStatus } from "../utils/normalizeStatus";
@@ -362,6 +361,13 @@ export default function Vote() {
       setGeneratingKeys(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const voterAddress = activeAddress || (await (await provider.getSigner()).getAddress());
+
+      // Auto-connect wallet to voter profile in database to ensure EthAddress is registered
+      try {
+        await api.post(`/users/connect-wallet?ethAddress=${encodeURIComponent(voterAddress)}`);
+      } catch (connErr) {
+        console.warn("Wallet auto-connection warning:", connErr);
+      }
 
       // Check if registered address matches
       const nonceRes = await api.get(`/vote/nonce/${electionId}`);
@@ -880,11 +886,11 @@ export default function Vote() {
       {currentElection && normalizeStatus(currentElection.status) === "Draft" && (
         <div className="bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-800 shadow-xl">
           <div className="flex items-center gap-3 mb-4">
-            <FaKey className="text-cyan-400" size={24} />
-            <h2 className="text-xl font-bold">Voter Security Key Setup (Draft Phase)</h2>
+            <FaCheckCircle className="text-cyan-400" size={24} />
+            <h2 className="text-xl font-bold">Voter Registration (Draft Phase)</h2>
           </div>
           <p className="text-slate-300 text-sm mb-5">
-            This election is currently in the **Draft** phase. To be eligible to cast a vote when the election goes live, you must generate your private key locally and register your public identity commitment.
+            This election is currently in the **Draft** phase. To be eligible to cast your vote when the election goes live, you must register your wallet.
           </p>
 
           {!voterKeys || !commitments.includes(voterKeys.commitment) ? (
@@ -893,62 +899,22 @@ export default function Vote() {
               disabled={generatingKeys || registeringCommitment}
               className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
             >
-              {generatingKeys ? "Generating Key..." : registeringCommitment ? "Registering Commitment..." : "Generate & Register Security Key"}
+              {generatingKeys ? "Generating secure keys..." : registeringCommitment ? "Registering..." : "Register to Vote"}
             </button>
           ) : (
             <div className="space-y-4">
-              <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
-                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">
-                  Your Identity Commitment
-                </span>
-                <code className="text-cyan-300 text-xs break-all block font-mono">
-                  {voterKeys.commitment}
-                </code>
-              </div>
-
               <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
                 <FaCheckCircle />
-                Your security commitment is registered successfully! Please wait for the election to start.
+                Your registration is complete! Please wait for the voting phase to start.
               </div>
             </div>
           )}
         </div>
       )}
 
-      {currentElection && normalizeStatus(currentElection.status) === "Active" && !hasVotedInSelected && (
-        <div className="bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-800 shadow-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <FaKey className="text-cyan-400" size={24} />
-            <h2 className="text-xl font-bold">Voter Security Key Verification</h2>
-          </div>
-
-          {!voterKeys ? (
-            <div>
-              <p className="text-slate-300 text-sm mb-5">
-                Your secure voting key will be automatically generated via MetaMask when you click "Vote" on a candidate. If you want to verify your registration upfront, you can also generate it manually now.
-              </p>
-              <button
-                onClick={() => generateKeys()}
-                disabled={generatingKeys}
-                className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
-              >
-                {generatingKeys ? "Generating..." : "Generate Security Keys"}
-              </button>
-            </div>
-          ) : (
-            <div>
-              {commitments.includes(voterKeys.commitment) ? (
-                <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
-                  <FaCheckCircle />
-                  Security key verified. You are eligible to vote.
-                </div>
-              ) : (
-                <div className="bg-red-500/15 border border-red-500/30 text-red-400 font-bold p-4 rounded-xl flex items-center gap-2">
-                  ⚠️ Your security key is not registered in this election's Merkle tree. You did not register during the draft phase and are not eligible to vote.
-                </div>
-              )}
-            </div>
-          )}
+      {currentElection && normalizeStatus(currentElection.status) === "Active" && !hasVotedInSelected && voterKeys && !commitments.includes(voterKeys.commitment) && (
+        <div className="bg-red-500/15 border border-red-500/30 text-red-400 font-bold p-4 rounded-xl flex items-center gap-2 mb-8">
+          ⚠️ You did not register during the draft phase and are not eligible to vote in this election.
         </div>
       )}
 
