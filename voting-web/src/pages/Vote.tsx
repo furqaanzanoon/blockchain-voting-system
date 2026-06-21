@@ -236,9 +236,28 @@ export default function Vote() {
 
   useEffect(() => {
     if (selectedElection) {
-      loadCandidates(selectedElection);
-      loadCommitments(selectedElection);
-      setVoterKeys(null);
+      const initWalletAndKeys = async () => {
+        loadCandidates(selectedElection);
+        loadCommitments(selectedElection);
+        setVoterKeys(null);
+
+        if (!window.ethereum) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const accounts = await provider.send("eth_accounts", []);
+          if (accounts.length > 0) {
+            const userId = localStorage.getItem("userId") || "";
+            const saved = sessionStorage.getItem(`voter_keys_${userId}_${selectedElection}`);
+            if (saved) {
+              setVoterKeys(JSON.parse(saved));
+            }
+          }
+        } catch (err) {
+          console.error("Auto wallet/key initialization failed:", err);
+        }
+      };
+
+      initWalletAndKeys();
     }
   }, [selectedElection]);
 
@@ -327,71 +346,25 @@ export default function Vote() {
     }
   };
 
-  const requestVoteOtp = async (
-    candidateId: string
-  ) => {
-    try {
-      setSendingOtpCandidateId(
-        candidateId
-      );
-
-      await api.post(
-        "/vote/send-otp",
-        {
-          electionId:
-            selectedElection,
-          candidateId,
-        }
-      );
-
-      setPendingVoteCandidateId(
-        candidateId
-      );
-      setOtp("");
-
-      showToast(
-        "OTP sent to your registered email.",
-        "info"
-      );
-    } catch (err: any) {
-      console.error(err);
-
-      const message =
-        err?.response?.data
-          ?.message ||
-        "Failed to send vote OTP";
-
-      showToast(
-        message ===
-          "Not registered for election"
-          ? "You are not registered for this election. Ask an admin or election officer to register you before voting."
-          : message,
-        "error"
-      );
-    } finally {
-      setSendingOtpCandidateId("");
-    }
-  };
-
-  const generateKeys = async () => {
+  const generateKeys = async (targetElectionId?: string, activeAddress?: string): Promise<{ secret: string; salt: string; commitment: string; } | null> => {
+    const electionId = targetElectionId || selectedElection;
     try {
       if (!window.ethereum) {
         showToast("Please install MetaMask to generate keys.", "warning");
-        return;
+        return null;
       }
-      const currentElection = elections.find(e => e.electionId === selectedElection);
+      const currentElection = elections.find(e => e.electionId === electionId);
       if (!currentElection) {
         showToast("Please select an election first.", "warning");
-        return;
+        return null;
       }
 
       setGeneratingKeys(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const voterAddress = await signer.getAddress();
+      const voterAddress = activeAddress || (await (await provider.getSigner()).getAddress());
 
       // Check if registered address matches
-      const nonceRes = await api.get(`/vote/nonce/${selectedElection}`);
+      const nonceRes = await api.get(`/vote/nonce/${electionId}`);
       const registeredAddress = nonceRes.data.registeredAddress;
 
       if (registeredAddress && voterAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
@@ -400,7 +373,7 @@ export default function Vote() {
           "error"
         );
         setGeneratingKeys(false);
-        return;
+        return null;
       }
 
       showToast("Sign the message in MetaMask to derive your secure voting keys.", "info");
@@ -424,32 +397,96 @@ export default function Vote() {
       const poseidon = await buildPoseidon();
       const commitment = poseidon.F.toObject(poseidon([BigInt(secret), BigInt(salt)])).toString();
 
-      setVoterKeys({ secret, salt, commitment });
+      const keys = { secret, salt, commitment };
+      setVoterKeys(keys);
+
+      const userId = localStorage.getItem("userId") || "";
+      sessionStorage.setItem(`voter_keys_${userId}_${electionId}`, JSON.stringify(keys));
+
       showToast("Keys generated successfully!", "success");
+      return keys;
     } catch (err: any) {
       console.error(err);
       const isUserRejection = err?.code === 4001 || err?.code === "ACTION_REJECTED" || err?.message?.includes("user rejected") || err?.message?.includes("User denied");
       showToast(isUserRejection ? "Signature request cancelled." : "Key generation failed.", isUserRejection ? "warning" : "error");
+      return null;
     } finally {
       setGeneratingKeys(false);
     }
   };
 
-  const registerCommitment = async () => {
-    if (!voterKeys) return;
+  const generateAndRegisterKey = async () => {
     try {
+      let keys = voterKeys;
+      if (!keys) {
+        keys = await generateKeys(selectedElection);
+      }
+      if (!keys) return;
+
       setRegisteringCommitment(true);
       await api.post("/vote/commitment", {
         electionId: selectedElection,
-        commitment: voterKeys.commitment
+        commitment: keys.commitment
       });
       showToast("Security commitment registered successfully!", "success");
       await loadCommitments(selectedElection);
     } catch (err: any) {
       console.error(err);
-      showToast(err?.response?.data?.message || "Failed to register commitment", "error");
+      const isUserRejection = err?.code === 4001 || err?.code === "ACTION_REJECTED" || err?.message?.includes("user rejected") || err?.message?.includes("User denied");
+      showToast(isUserRejection ? "Registration cancelled." : "Registration failed.", isUserRejection ? "warning" : "error");
     } finally {
       setRegisteringCommitment(false);
+    }
+  };
+
+  const requestVoteOtp = async (candidateId: string) => {
+    try {
+      let keys = voterKeys;
+      if (!keys) {
+        keys = await generateKeys(selectedElection);
+      }
+      if (!keys) {
+        return;
+      }
+
+      // Check if commitment is in commitments list
+      if (!commitments.includes(keys.commitment)) {
+        showToast("Your security commitment is not registered in this election's voter list.", "error");
+        return;
+      }
+
+      setSendingOtpCandidateId(candidateId);
+
+      await api.post(
+        "/vote/send-otp",
+        {
+          electionId: selectedElection,
+          candidateId,
+        }
+      );
+
+      setPendingVoteCandidateId(candidateId);
+      setOtp("");
+
+      showToast(
+        "OTP sent to your registered email.",
+        "info"
+      );
+    } catch (err: any) {
+      console.error(err);
+
+      const message =
+        err?.response?.data?.message ||
+        "Failed to send vote OTP";
+
+      showToast(
+        message === "Not registered for election"
+          ? "You are not registered for this election. Ask an admin or election officer to register you before voting."
+          : message,
+        "error"
+      );
+    } finally {
+      setSendingOtpCandidateId("");
     }
   };
 
@@ -850,13 +887,13 @@ export default function Vote() {
             This election is currently in the **Draft** phase. To be eligible to cast a vote when the election goes live, you must generate your private key locally and register your public identity commitment.
           </p>
 
-          {!voterKeys ? (
+          {!voterKeys || !commitments.includes(voterKeys.commitment) ? (
             <button
-              onClick={generateKeys}
-              disabled={generatingKeys}
+              onClick={generateAndRegisterKey}
+              disabled={generatingKeys || registeringCommitment}
               className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
             >
-              {generatingKeys ? "Generating..." : "Generate Security Keys"}
+              {generatingKeys ? "Generating Key..." : registeringCommitment ? "Registering Commitment..." : "Generate & Register Security Key"}
             </button>
           ) : (
             <div className="space-y-4">
@@ -869,20 +906,10 @@ export default function Vote() {
                 </code>
               </div>
 
-              {commitments.includes(voterKeys.commitment) ? (
-                <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
-                  <FaCheckCircle />
-                  Your security commitment is registered successfully! Please wait for the election to start.
-                </div>
-              ) : (
-                <button
-                  onClick={registerCommitment}
-                  disabled={registeringCommitment}
-                  className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
-                >
-                  {registeringCommitment ? "Registering..." : "Register Security Key"}
-                </button>
-              )}
+              <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
+                <FaCheckCircle />
+                Your security commitment is registered successfully! Please wait for the election to start.
+              </div>
             </div>
           )}
         </div>
@@ -898,10 +925,10 @@ export default function Vote() {
           {!voterKeys ? (
             <div>
               <p className="text-slate-300 text-sm mb-5">
-                Before casting your vote, please generate your secure voting key by signing a message using MetaMask.
+                Your secure voting key will be automatically generated via MetaMask when you click "Vote" on a candidate. If you want to verify your registration upfront, you can also generate it manually now.
               </p>
               <button
-                onClick={generateKeys}
+                onClick={() => generateKeys()}
                 disabled={generatingKeys}
                 className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
               >
@@ -1094,7 +1121,7 @@ export default function Vote() {
                   >
                     Election in Draft Phase
                   </button>
-                ) : !voterKeys || !commitments.includes(voterKeys.commitment) ? (
+                ) : voterKeys && !commitments.includes(voterKeys.commitment) ? (
                   <button
                     disabled
                     className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
