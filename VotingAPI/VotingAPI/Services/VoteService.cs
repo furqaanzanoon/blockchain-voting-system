@@ -107,7 +107,9 @@ namespace VotingAPI.Services
 
             var election = await dbContext.Elections.FirstOrDefaultAsync(e => e.ElectionId == electionId) ?? throw new KeyNotFoundException("Election not found");
             if (string.IsNullOrWhiteSpace(election.ContractAddress))
-                throw new InvalidOperationException("Election not deployed on chain");
+            {
+                return (0, voterAddress);
+            }
 
             var nonce = await blockchainService.GetVoterNonceAsync(election.ContractAddress, voterAddress);
             return (nonce, voterAddress);
