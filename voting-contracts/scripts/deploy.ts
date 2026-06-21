@@ -220,6 +220,45 @@ async function main() {
       err
     );
   }
+
+  // =====================================================
+  // Update web.config in the backend project
+  // =====================================================
+
+  const webConfigPath = path.resolve(
+    __dirname,
+    "../../VotingAPI/VotingAPI/web.config"
+  );
+
+  try {
+    let content = fs.readFileSync(webConfigPath, "utf-8");
+
+    content = content.replace(
+      /(name="BlockchainSettings__AccessControlAddress"\s+value=")[^"]*(")/,
+      `$1${accessControlAddress}$2`
+    );
+    content = content.replace(
+      /(name="BlockchainSettings__ZKVerifierAddress"\s+value=")[^"]*(")/,
+      `$1${zkVerifierAddress}$2`
+    );
+    content = content.replace(
+      /(name="BlockchainSettings__VoterRegistryAddress"\s+value=")[^"]*(")/,
+      `$1${registryAddress}$2`
+    );
+    content = content.replace(
+      /(name="BlockchainSettings__BallotFactoryAddress"\s+value=")[^"]*(")/,
+      `$1${ballotFactoryAddress}$2`
+    );
+    content = content.replace(
+      /(name="BlockchainSettings__ResultAggregatorAddress"\s+value=")[^"]*(")/,
+      `$1${aggregatorAddress}$2`
+    );
+
+    fs.writeFileSync(webConfigPath, content, "utf-8");
+    console.log("✅ web.config updated at:", webConfigPath);
+  } catch (err) {
+    console.error("❌ Failed to update web.config:", err);
+  }
 }
 
 main().catch((error) => {

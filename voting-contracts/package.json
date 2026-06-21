@@ -20,5 +20,8 @@
   },
   "scripts": {
     "compile": "npx hardhat compile && Nethereum.Generator.Console generate from-config -cfg ./nethereum-gen.json"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5"
   }
 }

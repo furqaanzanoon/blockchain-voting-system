@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
 import api from "../services/api";
+// @ts-ignore
+import * as snarkjs from "snarkjs";
+// @ts-ignore
+import { buildPoseidon } from "circomlibjs";
 import {
   FaVoteYea,
   FaUserTie,
@@ -463,25 +467,102 @@ export default function Vote() {
         return;
       }
 
-      // Construct ZK proof inputs and signals
-      // Convert keccak256 hex hashes to decimal strings to represent BigIntegers on-chain
-      const nullifierHash = BigInt(ethers.solidityPackedKeccak256(["address", "address"], [voterAddress, currentElection.contractAddress ?? ethers.ZeroAddress])).toString();
-      const ballotId = BigInt(ethers.solidityPackedKeccak256(["string"], [selectedElection])).toString();
-      const voteCommitment = BigInt(ethers.solidityPackedKeccak256(["uint256", "uint256"], [currentCandidate.onChainIndex ?? 0, 123456])).toString();
-      const merkleRoot = BigInt(ethers.solidityPackedKeccak256(["address"], [currentElection.contractAddress ?? ethers.ZeroAddress])).toString();
+      // Construct ZK proof inputs and signals using Poseidon and SnarkJS
+      showToast("Generating Zero-Knowledge proof locally in your browser. Please wait...", "info");
 
+      // @ts-ignore
+      const poseidon = await buildPoseidon();
+
+      // Convert voter address to field elements / bigints
+      const addressBigInt = BigInt(voterAddress);
+
+      // Derive secret and salt deterministically from the wallet address
+      const secret = poseidon.F.toString(poseidon([addressBigInt, BigInt(1)]));
+      const salt = poseidon.F.toString(poseidon([addressBigInt, BigInt(2)]));
+
+      // Calculate identity commitment: leaf = Poseidon(secret, salt)
+      const leafBigInt = poseidon([BigInt(secret), BigInt(salt)]);
+      const leafStr = poseidon.F.toString(leafBigInt);
+
+      // Create a local Merkle tree of depth 3 (8 leaves)
+      const leaves: string[] = [leafStr];
+      for (let i = 1; i < 8; i++) {
+        const dummyLeaf = poseidon.F.toString(poseidon([BigInt(i), BigInt(i)]));
+        leaves.push(dummyLeaf);
+      }
+
+      // Compute tree levels
+      const level0 = leaves.map(x => BigInt(x));
+      
+      const level1: bigint[] = [];
+      for (let i = 0; i < 8; i += 2) {
+        level1.push(poseidon([level0[i], level0[i+1]]));
+      }
+
+      const level2: bigint[] = [];
+      for (let i = 0; i < 4; i += 2) {
+        level2.push(poseidon([level1[i], level1[i+1]]));
+      }
+
+      const rootBigInt = poseidon([level2[0], level2[1]]);
+      const merkleRoot = poseidon.F.toString(rootBigInt);
+
+      // Compute sibling path for leaf index 0 (indices = ["0", "0", "0"])
+      const pathElements = [
+        poseidon.F.toString(level0[1]),
+        poseidon.F.toString(level1[1]),
+        poseidon.F.toString(level2[1])
+      ];
+      const pathIndices = ["0", "0", "0"];
+
+      // Nullifier: Poseidon(secret, ballotId)
+      const ballotIdBigInt = BigInt(ethers.solidityPackedKeccak256(["string"], [selectedElection])) % BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+      const ballotId = ballotIdBigInt.toString();
+
+      const nullifierHash = poseidon.F.toString(poseidon([BigInt(secret), ballotIdBigInt]));
+
+      // Vote commitment: Poseidon(candidateId, secret)
+      const candidateIdBigInt = BigInt(currentCandidate.onChainIndex ?? 0);
+      const voteCommitment = poseidon.F.toString(poseidon([candidateIdBigInt, BigInt(secret)]));
+
+      // Construct circuit inputs
+      const inputs = {
+        merkleRoot,
+        nullifierHash,
+        ballotId,
+        voteCommitment,
+        secret,
+        salt,
+        pathElements,
+        pathIndices,
+        candidateId: candidateIdBigInt.toString()
+      };
+
+      console.log("Proving with inputs:", inputs);
+
+      // Generate the real Groth16 proof using snarkjs
+      // @ts-ignore
+      const { proof: fullProof, publicSignals } = await snarkjs.groth16.fullProve(
+        inputs,
+        "/vote.wasm",
+        "/vote_final.zkey"
+      );
+
+      console.log("Proof generated!", fullProof, publicSignals);
+
+      // Reformat fullProof to match expected API structure:
       const proof = {
         a: {
-          x: "123456789",
-          y: "987654321"
+          x: fullProof.pi_a[0],
+          y: fullProof.pi_a[1]
         },
         b: {
-          x: ["11111111", "22222222"],
-          y: ["33333333", "44444444"]
+          x: [fullProof.pi_b[0][1], fullProof.pi_b[0][0]],
+          y: [fullProof.pi_b[1][1], fullProof.pi_b[1][0]]
         },
         c: {
-          x: "55555555",
-          y: "66666666"
+          x: fullProof.pi_c[0],
+          y: fullProof.pi_c[1]
         }
       };
 
