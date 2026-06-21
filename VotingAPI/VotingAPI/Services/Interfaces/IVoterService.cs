@@ -1,4 +1,4 @@
-﻿using VotingAPI.Models.DTOs.Voter;
+using VotingAPI.Models.DTOs.Voter;
 
 namespace VotingAPI.Services.Interfaces
 {

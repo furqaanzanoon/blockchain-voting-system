@@ -56,6 +56,14 @@ namespace VotingAPI.Controllers
         }
 
         [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ElectionOfficer)}")]
+        [HttpPost("{electionId:guid}/merkle-root")]
+        public async Task<IActionResult> UpdateElectionMerkleRoot(Guid electionId, [FromBody] UpdateMerkleRootDTO dto)
+        {
+            var result = await electionService.UpdateElectionMerkleRoot(electionId, dto.MerkleRoot);
+            return Ok(new { message = result });
+        }
+
+        [Authorize(Roles = $"{nameof(UserRole.Admin)},{nameof(UserRole.ElectionOfficer)}")]
         [HttpPut("{electionId:guid}/close")]
         public async Task<IActionResult> CloseElection(Guid electionId)
         {

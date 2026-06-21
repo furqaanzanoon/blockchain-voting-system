@@ -9,7 +9,7 @@ namespace VotingAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = nameof(UserRole.Voter))]
+    [Authorize]
     public class VoteController : ControllerBase
     {
         private readonly IVoteService voteService;
@@ -19,6 +19,7 @@ namespace VotingAPI.Controllers
             this.voteService = voteService;
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpPost("send-otp")]
         public async Task<IActionResult> SendVoteOtp([FromBody] VotePrepareRequestDTO votePrepareRequestDTO)
         {
@@ -28,6 +29,7 @@ namespace VotingAPI.Controllers
             return Ok(new { message = result });
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpGet("nonce/{electionId:guid}")]
         public async Task<IActionResult> GetVoterNonce(Guid electionId)
         {
@@ -37,6 +39,7 @@ namespace VotingAPI.Controllers
             return Ok(new { nonce = nonce, registeredAddress = registeredAddress });
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpPost("prepare")]
         public async Task<IActionResult> PrepareVote([FromBody] VotePrepareRequestDTO votePrepareRequestDTO)
         {
@@ -46,6 +49,7 @@ namespace VotingAPI.Controllers
             return Ok(new { message = result });
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpPost("confirm")]
         public async Task<IActionResult> ConfirmVote([FromBody] ConfirmVoteDTO confirmVoteDTO)
         {
@@ -55,6 +59,7 @@ namespace VotingAPI.Controllers
             return Ok(new { message = "Vote stored successfully" });
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpGet("receipt/{electionId:guid}")]
         public async Task<IActionResult> GetVoteReceipt(Guid electionId)
         {
@@ -67,6 +72,7 @@ namespace VotingAPI.Controllers
             return Ok(receipt);
         }
 
+        [Authorize(Roles = nameof(UserRole.Voter))]
         [HttpPost("zk")]
         public async Task<IActionResult> CastZkVote([FromBody] CastZkVoteDTO dto)
         {
@@ -74,6 +80,24 @@ namespace VotingAPI.Controllers
 
             var (txHash, blockNumber) = await voteService.CastZkVoteAsync(Guid.Parse(userId!), dto);
             return Ok(new { txHash = txHash, blockNumber = blockNumber });
+        }
+
+        [Authorize(Roles = nameof(UserRole.Voter))]
+        [HttpPost("commitment")]
+        public async Task<IActionResult> RegisterVoterCommitment([FromBody] RegisterCommitmentDTO dto)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Not logged in");
+
+            var result = await voteService.RegisterVoterCommitment(dto.ElectionId, Guid.Parse(userId!), dto.Commitment);
+            return Ok(new { message = result });
+        }
+
+        [Authorize(Roles = $"{nameof(UserRole.Voter)},{nameof(UserRole.Admin)},{nameof(UserRole.ElectionOfficer)}")]
+        [HttpGet("commitments/{electionId:guid}")]
+        public async Task<IActionResult> GetElectionVoterCommitments(Guid electionId)
+        {
+            var result = await voteService.GetElectionVoterCommitments(electionId);
+            return Ok(result);
         }
     }
 }

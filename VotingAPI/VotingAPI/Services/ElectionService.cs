@@ -172,6 +172,25 @@ namespace VotingAPI.Services
                     await blockchainService.SetEligibilityAsync(votingContractAddress, voter.User.EthAddress!);
                 }
 
+                // Publish Merkle root to ZKVerifier if set
+                if (!string.IsNullOrEmpty(election.MerkleRoot))
+                {
+                    var electionIdStr = election.ElectionId.ToString().ToLower();
+                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes(electionIdStr);
+                    byte[] hashBytes = new Nethereum.Util.Sha3Keccack().CalculateHash(bytes);
+                    var ballotId = new System.Numerics.BigInteger(hashBytes, isUnsigned: true, isBigEndian: true);
+                    var r = System.Numerics.BigInteger.Parse("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+                    var ballotIdBigInt = ballotId % r;
+
+                    var merkleRootBigInt = System.Numerics.BigInteger.Parse(election.MerkleRoot);
+
+                    await blockchainService.SetBallotRootAsync(ballotIdBigInt, merkleRootBigInt);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Voter commitments must be finalized and Merkle root computed before activating the election.");
+                }
+
                 election.ContractAddress = votingContractAddress;
                 election.Status = ElectionStatus.Active;
                 await dbContext.SaveChangesAsync();
@@ -333,6 +352,23 @@ namespace VotingAPI.Services
             await dbContext.SaveChangesAsync();
 
             return "Candidate approved successfully";
+        }
+
+        public async Task<string> UpdateElectionMerkleRoot(Guid electionId, string merkleRoot)
+        {
+            if (string.IsNullOrWhiteSpace(merkleRoot))
+                throw new ArgumentException("Merkle root is required");
+
+            var election = await dbContext.Elections.FirstOrDefaultAsync(e => e.ElectionId == electionId) 
+                ?? throw new KeyNotFoundException("Election not found");
+
+            if (election.Status != ElectionStatus.Draft)
+                throw new InvalidOperationException("Merkle root can only be updated during the draft phase");
+
+            election.MerkleRoot = merkleRoot;
+            await dbContext.SaveChangesAsync();
+
+            return "Election Merkle root updated successfully";
         }
     }
 }

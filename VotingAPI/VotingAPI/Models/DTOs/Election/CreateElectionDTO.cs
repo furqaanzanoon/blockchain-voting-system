@@ -20,4 +20,10 @@ namespace VotingAPI.Models.DTOs.Election
         public bool AutoActivate { get; set; }
         public bool AutoClose { get; set; }
     }
+
+    public class UpdateMerkleRootDTO
+    {
+        [Required]
+        public string MerkleRoot { get; set; } = string.Empty;
+    }
 }

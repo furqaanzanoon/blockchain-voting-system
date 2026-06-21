@@ -13,6 +13,7 @@ import {
   FaMicrophone,
   FaMicrophoneSlash,
   FaExternalLinkAlt,
+  FaKey,
 } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
 import { normalizeStatus } from "../utils/normalizeStatus";
@@ -72,6 +73,11 @@ export default function Vote() {
   const [activeVoiceCandidateId, setActiveVoiceCandidateId] = useState("");
   const [voteReceipt, setVoteReceipt] = useState<VoteReceipt | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+
+  const [commitments, setCommitments] = useState<string[]>([]);
+  const [voterKeys, setVoterKeys] = useState<{ secret: string; salt: string; commitment: string } | null>(null);
+  const [registeringCommitment, setRegisteringCommitment] = useState(false);
+  const [generatingKeys, setGeneratingKeys] = useState(false);
 
   const handleVoiceCancel = () => {
     setActiveVoiceCandidateId("");
@@ -230,11 +236,21 @@ export default function Vote() {
 
   useEffect(() => {
     if (selectedElection) {
-      loadCandidates(
-        selectedElection
-      );
+      loadCandidates(selectedElection);
+      loadCommitments(selectedElection);
+      setVoterKeys(null);
     }
   }, [selectedElection]);
+
+  const loadCommitments = async (electionId: string) => {
+    try {
+      const res = await api.get(`/vote/commitments/${electionId}`);
+      setCommitments(res.data);
+    } catch (err) {
+      console.error("Failed to load commitments:", err);
+      setCommitments([]);
+    }
+  };
 
   const loadElections = async () => {
     try {
@@ -243,15 +259,15 @@ export default function Vote() {
       const allElections: Election[] =
         (res.data.elections ?? []).map(normalizeElection);
 
-      // Only show active elections (not closed, not draft) and whose closing time has not passed
+      // Show active or draft elections whose closing time has not passed
       const list = allElections.filter((e) => {
-        const isStatusActive = normalizeStatus(e.status) === "Active";
+        const statusStr = normalizeStatus(e.status);
         const rawEndTime = e.endTime;
         const endTimeStr = typeof rawEndTime === "string" && !/Z|[+-]\d{2}:\d{2}$/.test(rawEndTime)
           ? rawEndTime + "Z"
           : rawEndTime;
         const isNotEnded = new Date(endTimeStr) > new Date();
-        return isStatusActive && isNotEnded;
+        return (statusStr === "Active" || statusStr === "Draft") && isNotEnded;
       });
 
       setElections(list);
@@ -354,6 +370,86 @@ export default function Vote() {
       );
     } finally {
       setSendingOtpCandidateId("");
+    }
+  };
+
+  const generateKeys = async () => {
+    try {
+      if (!window.ethereum) {
+        showToast("Please install MetaMask to generate keys.", "warning");
+        return;
+      }
+      const currentElection = elections.find(e => e.electionId === selectedElection);
+      if (!currentElection) {
+        showToast("Please select an election first.", "warning");
+        return;
+      }
+
+      setGeneratingKeys(true);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const voterAddress = await signer.getAddress();
+
+      // Check if registered address matches
+      const nonceRes = await api.get(`/vote/nonce/${selectedElection}`);
+      const registeredAddress = nonceRes.data.registeredAddress;
+
+      if (registeredAddress && voterAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
+        showToast(
+          `Your active MetaMask account (${voterAddress.slice(0, 6)}...${voterAddress.slice(-4)}) does not match your registered voting address (${registeredAddress.slice(0, 6)}...${registeredAddress.slice(-4)}). Please switch MetaMask to your registered account.`,
+          "error"
+        );
+        setGeneratingKeys(false);
+        return;
+      }
+
+      showToast("Sign the message in MetaMask to derive your secure voting keys.", "info");
+      
+      const message = `Sign to generate your secure voting key for Election: ${currentElection.title}`;
+      const signature = await provider.send("personal_sign", [
+        ethers.hexlify(ethers.toUtf8Bytes(message)),
+        voterAddress
+      ]);
+
+      const sigHash = ethers.keccak256(signature);
+      const secretHash = ethers.keccak256(ethers.solidityPacked(["string", "string"], [sigHash, "secret"]));
+      const saltHash = ethers.keccak256(ethers.solidityPacked(["string", "string"], [sigHash, "salt"]));
+      const r = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+      
+      const secret = (BigInt(secretHash) % r).toString();
+      const salt = (BigInt(saltHash) % r).toString();
+
+      // Calculate commitment
+      // @ts-ignore
+      const poseidon = await buildPoseidon();
+      const commitment = poseidon.F.toObject(poseidon([BigInt(secret), BigInt(salt)])).toString();
+
+      setVoterKeys({ secret, salt, commitment });
+      showToast("Keys generated successfully!", "success");
+    } catch (err: any) {
+      console.error(err);
+      const isUserRejection = err?.code === 4001 || err?.code === "ACTION_REJECTED" || err?.message?.includes("user rejected") || err?.message?.includes("User denied");
+      showToast(isUserRejection ? "Signature request cancelled." : "Key generation failed.", isUserRejection ? "warning" : "error");
+    } finally {
+      setGeneratingKeys(false);
+    }
+  };
+
+  const registerCommitment = async () => {
+    if (!voterKeys) return;
+    try {
+      setRegisteringCommitment(true);
+      await api.post("/vote/commitment", {
+        electionId: selectedElection,
+        commitment: voterKeys.commitment
+      });
+      showToast("Security commitment registered successfully!", "success");
+      await loadCommitments(selectedElection);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err?.response?.data?.message || "Failed to register commitment", "error");
+    } finally {
+      setRegisteringCommitment(false);
     }
   };
 
@@ -467,32 +563,35 @@ export default function Vote() {
         return;
       }
 
+      if (!voterKeys) {
+        showToast("Please generate your secure voting key first.", "warning");
+        return;
+      }
+
+      const secret = voterKeys.secret;
+      const salt = voterKeys.salt;
+      const leafStr = voterKeys.commitment;
+
+      const commitmentsList = [...commitments];
+      if (!commitmentsList.includes(leafStr)) {
+        showToast("Your security commitment is not registered in this election's voter list.", "error");
+        return;
+      }
+
       // Construct ZK proof inputs and signals using Poseidon and SnarkJS
       showToast("Generating Zero-Knowledge proof locally in your browser. Please wait...", "info");
 
       // @ts-ignore
       const poseidon = await buildPoseidon();
 
-      // Convert voter address to field elements / bigints
-      const addressBigInt = BigInt(voterAddress);
-
-      // Derive secret and salt deterministically from the wallet address
-      const secret = poseidon.F.toObject(poseidon([addressBigInt, BigInt(1)])).toString();
-      const salt = poseidon.F.toObject(poseidon([addressBigInt, BigInt(2)])).toString();
-
-      // Calculate identity commitment: leaf = Poseidon(secret, salt)
-      const leafBigInt = poseidon.F.toObject(poseidon([BigInt(secret), BigInt(salt)]));
-      const leafStr = leafBigInt.toString();
-
-      // Create a local Merkle tree of depth 3 (8 leaves)
-      const leaves: string[] = [leafStr];
-      for (let i = 1; i < 8; i++) {
+      // Pad commitments to 8 leaves
+      for (let i = commitmentsList.length; i < 8; i++) {
         const dummyLeaf = poseidon.F.toObject(poseidon([BigInt(i), BigInt(i)])).toString();
-        leaves.push(dummyLeaf);
+        commitmentsList.push(dummyLeaf);
       }
 
       // Compute tree levels
-      const level0 = leaves.map(x => BigInt(x));
+      const level0 = commitmentsList.map(x => BigInt(x));
       
       const level1: bigint[] = [];
       for (let i = 0; i < 8; i += 2) {
@@ -509,13 +608,27 @@ export default function Vote() {
       const rootBigInt = poseidon.F.toObject(poseidon([level2[0], level2[1]]));
       const merkleRoot = rootBigInt.toString();
 
-      // Compute sibling path for leaf index 0 (indices = ["0", "0", "0"])
-      const pathElements = [
-        level0[1].toString(),
-        level1[1].toString(),
-        level2[1].toString()
-      ];
-      const pathIndices = ["0", "0", "0"];
+      // Compute sibling path for the voter's leaf index
+      const leafIndex = commitmentsList.indexOf(leafStr);
+      const pathElements: string[] = [];
+      const pathIndices: string[] = [];
+
+      // Level 0 sibling
+      const s0 = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
+      pathElements.push(level0[s0].toString());
+      pathIndices.push((leafIndex % 2).toString());
+
+      // Level 1 sibling
+      const p1 = Math.floor(leafIndex / 2);
+      const s1 = p1 % 2 === 0 ? p1 + 1 : p1 - 1;
+      pathElements.push(level1[s1].toString());
+      pathIndices.push((p1 % 2).toString());
+
+      // Level 2 sibling
+      const p2 = Math.floor(p1 / 2);
+      const s2 = p2 % 2 === 0 ? p2 + 1 : p2 - 1;
+      pathElements.push(level2[s2].toString());
+      pathIndices.push((p2 % 2).toString());
 
       // Nullifier: Poseidon(secret, ballotId)
       const ballotIdBigInt = BigInt(ethers.solidityPackedKeccak256(["string"], [selectedElection])) % BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
@@ -727,6 +840,91 @@ export default function Vote() {
         </select>
       </div>
 
+      {currentElection && normalizeStatus(currentElection.status) === "Draft" && (
+        <div className="bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-800 shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <FaKey className="text-cyan-400" size={24} />
+            <h2 className="text-xl font-bold">Voter Security Key Setup (Draft Phase)</h2>
+          </div>
+          <p className="text-slate-300 text-sm mb-5">
+            This election is currently in the **Draft** phase. To be eligible to cast a vote when the election goes live, you must generate your private key locally and register your public identity commitment.
+          </p>
+
+          {!voterKeys ? (
+            <button
+              onClick={generateKeys}
+              disabled={generatingKeys}
+              className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
+            >
+              {generatingKeys ? "Generating..." : "Generate Security Keys"}
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
+                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">
+                  Your Identity Commitment
+                </span>
+                <code className="text-cyan-300 text-xs break-all block font-mono">
+                  {voterKeys.commitment}
+                </code>
+              </div>
+
+              {commitments.includes(voterKeys.commitment) ? (
+                <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
+                  <FaCheckCircle />
+                  Your security commitment is registered successfully! Please wait for the election to start.
+                </div>
+              ) : (
+                <button
+                  onClick={registerCommitment}
+                  disabled={registeringCommitment}
+                  className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
+                >
+                  {registeringCommitment ? "Registering..." : "Register Security Key"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {currentElection && normalizeStatus(currentElection.status) === "Active" && !hasVotedInSelected && (
+        <div className="bg-slate-900 rounded-3xl p-6 mb-8 border border-slate-800 shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <FaKey className="text-cyan-400" size={24} />
+            <h2 className="text-xl font-bold">Voter Security Key Verification</h2>
+          </div>
+
+          {!voterKeys ? (
+            <div>
+              <p className="text-slate-300 text-sm mb-5">
+                Before casting your vote, please generate your secure voting key by signing a message using MetaMask.
+              </p>
+              <button
+                onClick={generateKeys}
+                disabled={generatingKeys}
+                className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 text-black font-bold px-6 py-3 rounded-xl transition duration-200"
+              >
+                {generatingKeys ? "Generating..." : "Generate Security Keys"}
+              </button>
+            </div>
+          ) : (
+            <div>
+              {commitments.includes(voterKeys.commitment) ? (
+                <div className="bg-green-500/15 border border-green-500/30 text-green-400 font-bold p-4 rounded-xl flex items-center gap-2">
+                  <FaCheckCircle />
+                  Security key verified. You are eligible to vote.
+                </div>
+              ) : (
+                <div className="bg-red-500/15 border border-red-500/30 text-red-400 font-bold p-4 rounded-xl flex items-center gap-2">
+                  ⚠️ Your security key is not registered in this election's Merkle tree. You did not register during the draft phase and are not eligible to vote.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {hasVotedInSelected && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-3xl p-6 mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -889,6 +1087,20 @@ export default function Vote() {
                     <FaCheckCircle />
                     Voted Successfully
                   </div>
+                ) : currentElection && normalizeStatus(currentElection.status) === "Draft" ? (
+                  <button
+                    disabled
+                    className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
+                  >
+                    Election in Draft Phase
+                  </button>
+                ) : !voterKeys || !commitments.includes(voterKeys.commitment) ? (
+                  <button
+                    disabled
+                    className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed border border-slate-700/50"
+                  >
+                    Security Key Not Registered
+                  </button>
                 ) : (
                   <button
                     onClick={() =>

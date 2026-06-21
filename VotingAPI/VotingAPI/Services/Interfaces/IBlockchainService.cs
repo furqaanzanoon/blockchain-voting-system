@@ -17,5 +17,6 @@ namespace VotingAPI.Services.Interfaces
             VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.Proof proof, 
             VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.PublicSignals signals
         );
+        Task SetBallotRootAsync(System.Numerics.BigInteger ballotId, System.Numerics.BigInteger merkleRoot);
     }
 }

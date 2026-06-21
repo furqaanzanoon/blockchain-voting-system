@@ -181,5 +181,11 @@ namespace VotingAPI.Services
             var receipt = await zkVerifierService.VerifyAndVoteRequestAndWaitForReceiptAsync(proof, signals);
             return (receipt.TransactionHash, (long)receipt.BlockNumber.Value);
         }
+
+        public async Task SetBallotRootAsync(System.Numerics.BigInteger ballotId, System.Numerics.BigInteger merkleRoot)
+        {
+            var zkVerifierService = new VotingAPI.Services.Blockchain.Generated.ZKVerifier.ZKVerifierService(web3, zkVerifierAddress);
+            await zkVerifierService.SetBallotRootRequestAndWaitForReceiptAsync(ballotId, merkleRoot);
+        }
     }
 }

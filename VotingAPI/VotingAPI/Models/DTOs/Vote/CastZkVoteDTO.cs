@@ -38,4 +38,10 @@ namespace VotingAPI.Models.DTOs.Vote
         public ProofDTO Proof { get; set; } = null!;
         public PublicSignalsDTO PublicSignals { get; set; } = null!;
     }
+
+    public class RegisterCommitmentDTO
+    {
+        public Guid ElectionId { get; set; }
+        public string Commitment { get; set; } = string.Empty;
+    }
 }

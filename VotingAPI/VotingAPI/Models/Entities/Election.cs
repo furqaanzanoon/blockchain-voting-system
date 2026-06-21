@@ -37,6 +37,9 @@ namespace VotingAPI.Models.Entities
 
         public DateTime CreatedAt { get; set; }
 
+        [MaxLength(78)]
+        public string? MerkleRoot { get; set; }
+
         // Foreign key
         public Guid CreatedBy { get; set; }
 

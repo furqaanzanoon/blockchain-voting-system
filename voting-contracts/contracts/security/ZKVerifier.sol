@@ -106,12 +106,6 @@ contract ZKVerifier {
         Proof calldata proof,
         PublicSignals calldata signals
     ) external {
-        // Instantiate ballotRoots[signals.ballotId] if it's currently 0
-        if (ballotRoots[signals.ballotId] == 0) {
-            ballotRoots[signals.ballotId] = signals.merkleRoot;
-            emit BallotRootSet(signals.ballotId, signals.merkleRoot);
-        }
-
         require(
             ballotRoots[signals.ballotId] == signals.merkleRoot,
             "Unknown Merkle root"

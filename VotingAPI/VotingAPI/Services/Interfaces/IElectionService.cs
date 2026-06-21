@@ -13,5 +13,6 @@ namespace VotingAPI.Services.Interfaces
         Task<string> RemoveCandidate(Guid electionId, Guid candidateId);
         Task<List<CandidateResponseDTO>> GetCandidates(Guid electionId, bool includeUnapproved);
         Task<string> ApproveCandidate(Guid electionId, Guid candidateId);
+        Task<string> UpdateElectionMerkleRoot(Guid electionId, string merkleRoot);
     }
 }

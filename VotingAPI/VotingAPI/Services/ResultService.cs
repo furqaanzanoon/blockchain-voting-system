@@ -27,7 +27,15 @@ namespace VotingAPI.Services
             if (string.IsNullOrWhiteSpace(election.ContractAddress))
                 throw new InvalidOperationException("Election not activated");
 
-            var results = await blockchainService.GetResultsAsync(election.ContractAddress);
+            var results = await dbContext.Candidates
+                .Where(c => c.ElectionId == electionId)
+                .Select(c => new CandidateResultDTO
+                {
+                    CandidateName = c.Name,
+                    VoteCount = dbContext.VoteTransactions.Count(vt => vt.CandidateId == c.CandidateId)
+                })
+                .OrderByDescending(r => r.VoteCount)
+                .ToListAsync();
 
             return results;
         }

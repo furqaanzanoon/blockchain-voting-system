@@ -38,6 +38,9 @@ namespace VotingAPI.Data.Migrations
                     b.Property<Guid>("ElectionId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -88,6 +91,10 @@ namespace VotingAPI.Data.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("MerkleRoot")
+                        .HasMaxLength(78)
+                        .HasColumnType("nvarchar(78)");
+
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("datetime2");
 
@@ -102,6 +109,12 @@ namespace VotingAPI.Data.Migrations
                     b.HasKey("ElectionId");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Status", "EndTime");
+
+                    b.HasIndex("Status", "StartTime");
 
                     b.ToTable("Elections");
                 });
@@ -126,6 +139,9 @@ namespace VotingAPI.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsVerified")
                         .HasColumnType("bit");
 
@@ -134,6 +150,9 @@ namespace VotingAPI.Data.Migrations
 
                     b.Property<DateTime?>("OtpExpiry")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("PartyAffiliation")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -177,17 +196,11 @@ namespace VotingAPI.Data.Migrations
                     b.Property<DateTime>("VotedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("VoterId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("VoteId");
 
                     b.HasIndex("CandidateId");
 
-                    b.HasIndex("VoterId");
-
-                    b.HasIndex("ElectionId", "VoterId")
-                        .IsUnique();
+                    b.HasIndex("ElectionId");
 
                     b.ToTable("VoteTransactions");
                 });
@@ -198,14 +211,25 @@ namespace VotingAPI.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<long?>("BlockNumber")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("ElectionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("HasVoted")
                         .HasColumnType("bit");
 
+                    b.Property<string>("IdentityCommitment")
+                        .HasMaxLength(78)
+                        .HasColumnType("nvarchar(78)");
+
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("TxHash")
+                        .HasMaxLength(66)
+                        .HasColumnType("nvarchar(66)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -256,17 +280,9 @@ namespace VotingAPI.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("VotingAPI.Models.Entities.User", "User")
-                        .WithMany("VoteTransactions")
-                        .HasForeignKey("VoterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Candidate");
 
                     b.Navigation("Election");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("VotingAPI.Models.Entities.Voter", b =>
@@ -305,8 +321,6 @@ namespace VotingAPI.Data.Migrations
             modelBuilder.Entity("VotingAPI.Models.Entities.User", b =>
                 {
                     b.Navigation("CreatedElections");
-
-                    b.Navigation("VoteTransactions");
 
                     b.Navigation("Voters");
                 });

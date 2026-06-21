@@ -15,5 +15,9 @@ namespace VotingAPI.Services.Interfaces
         Task<VoteReceiptDTO?> GetVoteReceipt(Guid userId, Guid electionId);
 
         Task<(string TxHash, long BlockNumber)> CastZkVoteAsync(Guid userId, CastZkVoteDTO castZkVoteDTO);
+
+        Task<string> RegisterVoterCommitment(Guid electionId, Guid userId, string commitment);
+
+        Task<List<string>> GetElectionVoterCommitments(Guid electionId);
     }
 }

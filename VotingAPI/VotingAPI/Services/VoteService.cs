@@ -299,5 +299,40 @@ namespace VotingAPI.Services
 
             return (txHash, blockNumber);
         }
+
+        public async Task<string> RegisterVoterCommitment(Guid electionId, Guid userId, string commitment)
+        {
+            if (string.IsNullOrWhiteSpace(commitment))
+                throw new ArgumentException("Identity commitment is required");
+
+            var voter = await dbContext.Voters
+                .Include(v => v.Election)
+                .FirstOrDefaultAsync(v => v.UserId == userId && v.ElectionId == electionId) 
+                ?? throw new KeyNotFoundException("Voter registration not found for this election");
+
+            if (voter.Election.Status != ElectionStatus.Draft)
+                throw new InvalidOperationException("Identity commitment can only be registered during the draft phase");
+
+            voter.IdentityCommitment = commitment;
+            await dbContext.SaveChangesAsync();
+
+            return "Voter identity commitment registered successfully";
+        }
+
+        public async Task<List<string>> GetElectionVoterCommitments(Guid electionId)
+        {
+            var electionExists = await dbContext.Elections.AnyAsync(e => e.ElectionId == electionId);
+            if (!electionExists)
+                throw new KeyNotFoundException("Election not found");
+
+            // We order deterministically by VoterId to build the identical Merkle tree on both frontend and backend
+            var commitments = await dbContext.Voters
+                .Where(v => v.ElectionId == electionId && !string.IsNullOrEmpty(v.IdentityCommitment))
+                .OrderBy(v => v.VoterId)
+                .Select(v => v.IdentityCommitment!)
+                .ToListAsync();
+
+            return commitments;
+        }
     }
 }

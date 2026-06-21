@@ -17,6 +17,9 @@ namespace VotingAPI.Models.Entities
 
         public DateTime RegisteredAt { get; set; }
 
+        [MaxLength(78)]
+        public string? IdentityCommitment { get; set; }
+
         // Foreign keys
         public Guid ElectionId { get; set; }
         public Guid UserId { get; set; }
