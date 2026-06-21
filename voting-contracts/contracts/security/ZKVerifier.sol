@@ -119,21 +119,7 @@ contract ZKVerifier {
         require(nullifierUsed[signals.nullifierHash] == 0, "Nullifier already spent");
         require(signals.voteCommitment != 0, "Empty vote commitment");
 
-        // Convert structures to flat arrays for verifyProof
-        uint[2] memory pA = [proof.a.x, proof.a.y];
-        uint[2][2] memory pB = [
-            [proof.b.x[0], proof.b.x[1]],
-            [proof.b.y[0], proof.b.y[1]]
-        ];
-        uint[2] memory pC = [proof.c.x, proof.c.y];
-        uint[4] memory pubSignals = [
-            signals.merkleRoot,
-            signals.nullifierHash,
-            signals.ballotId,
-            signals.voteCommitment
-        ];
-
-        require(verifyProof(pA, pB, pC, pubSignals), "Invalid zk proof");
+        require(verifyProof(proof.a, proof.b, proof.c, signals), "Invalid zk proof");
 
         nullifierUsed[signals.nullifierHash] = signals.ballotId + 1;
         voteCommitments[signals.ballotId].push(signals.voteCommitment);
@@ -165,8 +151,13 @@ contract ZKVerifier {
         return nullifierUsed[_nullifier] != 0;
     }
 
-    // ─── Groth16 verifyProof from SnarkJS (using memory load) ────────────────────
-    function verifyProof(uint[2] memory _pA, uint[2][2] memory _pB, uint[2] memory _pC, uint[4] memory _pubSignals) public view returns (bool isValidProof) {
+    // ─── Groth16 verifyProof from SnarkJS (using calldata load) ────────────────────
+    function verifyProof(
+        G1Point calldata _pA,
+        G2Point calldata _pB,
+        G1Point calldata _pC,
+        PublicSignals calldata _pubSignals
+    ) public view returns (bool isValidProof) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -210,24 +201,24 @@ contract ZKVerifier {
 
                 // Compute the linear combination vk_x
                 
-                g1_mulAccC(_pVk, IC1x, IC1y, mload(add(pubSignals, 0)))
+                g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
                 
-                g1_mulAccC(_pVk, IC2x, IC2y, mload(add(pubSignals, 32)))
+                g1_mulAccC(_pVk, IC2x, IC2y, calldataload(add(pubSignals, 32)))
                 
-                g1_mulAccC(_pVk, IC3x, IC3y, mload(add(pubSignals, 64)))
+                g1_mulAccC(_pVk, IC3x, IC3y, calldataload(add(pubSignals, 64)))
                 
-                g1_mulAccC(_pVk, IC4x, IC4y, mload(add(pubSignals, 96)))
+                g1_mulAccC(_pVk, IC4x, IC4y, calldataload(add(pubSignals, 96)))
                 
 
                 // -A
-                mstore(_pPairing, mload(pA))
-                mstore(add(_pPairing, 32), mod(sub(q, mload(add(pA, 32))), q))
+                mstore(_pPairing, calldataload(pA))
+                mstore(add(_pPairing, 32), mod(sub(q, calldataload(add(pA, 32))), q))
 
                 // B
-                mstore(add(_pPairing, 64), mload(pB))
-                mstore(add(_pPairing, 96), mload(add(pB, 32)))
-                mstore(add(_pPairing, 128), mload(add(pB, 64)))
-                mstore(add(_pPairing, 160), mload(add(pB, 96)))
+                mstore(add(_pPairing, 64), calldataload(pB))
+                mstore(add(_pPairing, 96), calldataload(add(pB, 32)))
+                mstore(add(_pPairing, 128), calldataload(add(pB, 64)))
+                mstore(add(_pPairing, 160), calldataload(add(pB, 96)))
 
                 // alpha1
                 mstore(add(_pPairing, 192), alphax)
@@ -251,8 +242,8 @@ contract ZKVerifier {
                 mstore(add(_pPairing, 544), gammay2)
 
                 // C
-                mstore(add(_pPairing, 576), mload(pC))
-                mstore(add(_pPairing, 608), mload(add(pC, 32)))
+                mstore(add(_pPairing, 576), calldataload(pC))
+                mstore(add(_pPairing, 608), calldataload(add(pC, 32)))
 
                 // delta2
                 mstore(add(_pPairing, 640), deltax1)
@@ -271,13 +262,13 @@ contract ZKVerifier {
 
             // Validate that all evaluations ∈ F
             
-            checkField(mload(add(_pubSignals, 0)))
+            checkField(calldataload(add(_pubSignals, 0)))
             
-            checkField(mload(add(_pubSignals, 32)))
+            checkField(calldataload(add(_pubSignals, 32)))
             
-            checkField(mload(add(_pubSignals, 64)))
+            checkField(calldataload(add(_pubSignals, 64)))
             
-            checkField(mload(add(_pubSignals, 96)))
+            checkField(calldataload(add(_pubSignals, 96)))
             
 
             // Validate all evaluations
