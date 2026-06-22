@@ -216,12 +216,7 @@ export default function Results() {
           Vote Distribution
         </h2>
 
-        <div
-          style={{
-            width: "100%",
-            height: 450,
-          }}
-        >
+        <div className="w-full h-[300px] sm:h-[400px] md:h-[450px]">
           <Suspense fallback={<div className="text-slate-400 text-center py-20">Loading chart...</div>}>
             <ResultsChart data={results} />
           </Suspense>

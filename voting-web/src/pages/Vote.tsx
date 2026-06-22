@@ -9,6 +9,8 @@ import {
   FaMicrophone,
   FaMicrophoneSlash,
   FaExternalLinkAlt,
+  FaWallet,
+  FaTimes,
 } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
 import { normalizeStatus } from "../utils/normalizeStatus";
@@ -48,13 +50,94 @@ const normalizeElection = (e: any): Election => ({
   contractAddress: e.contractAddress ?? e.ContractAddress ?? "",
 });
 
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 export default function Vote() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [elections, setElections] = useState<Election[]>([]);
   const [selectedElection, setSelectedElection] = useState("");
   const [loadingCandidateId, setLoadingCandidateId] = useState("");
+  const [wallet, setWallet] = useState(localStorage.getItem("walletAddress") || "");
 
   const { showToast } = useToast();
+
+  const getMetaMaskDeepLink = () => {
+    const host = window.location.host;
+    const path = window.location.pathname + window.location.search;
+    const cleanUrl = `${host}${path}`.replace(/^https?:\/\//, '');
+    return `https://metamask.app.link/dapp/${cleanUrl}`;
+  };
+
+  const connect = async () => {
+    try {
+      if (!window.ethereum) {
+        showToast("MetaMask is not installed. Please install MetaMask.", "warning");
+        return;
+      }
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0];
+        setWallet(address);
+        localStorage.setItem("walletAddress", address);
+        
+        const role = localStorage.getItem("role");
+        if (role === "Voter") {
+          await api.post(
+            `/users/connect-wallet?ethAddress=${encodeURIComponent(address)}`
+          );
+        }
+        showToast("Wallet Connected Successfully", "success");
+      }
+    } catch (error: any) {
+      console.error(error);
+      showToast(error?.response?.data?.message || "Failed to connect wallet", "error");
+    }
+  };
+
+  useEffect(() => {
+    const checkWalletConnected = async () => {
+      if (window.ethereum) {
+        try {
+          const accounts: string[] = await window.ethereum.request({
+            method: "eth_accounts",
+          });
+          if (accounts && accounts.length > 0) {
+            setWallet(accounts[0]);
+            localStorage.setItem("walletAddress", accounts[0]);
+          } else {
+            setWallet("");
+            localStorage.removeItem("walletAddress");
+          }
+        } catch (err) {
+          console.error("Error checking accounts:", err);
+        }
+      } else {
+        setWallet("");
+      }
+    };
+
+    checkWalletConnected();
+
+    if (window.ethereum) {
+      const handleAccounts = (accounts: string[]) => {
+        if (accounts.length > 0) {
+          setWallet(accounts[0]);
+          localStorage.setItem("walletAddress", accounts[0]);
+        } else {
+          setWallet("");
+          localStorage.removeItem("walletAddress");
+        }
+      };
+      window.ethereum.on("accountsChanged", handleAccounts);
+      return () => {
+        window.ethereum.removeListener("accountsChanged", handleAccounts);
+      };
+    }
+  }, []);
   const [sendingOtpCandidateId, setSendingOtpCandidateId] = useState("");
   const [pendingVoteCandidateId, setPendingVoteCandidateId] = useState("");
   const [otp, setOtp] = useState("");
@@ -576,6 +659,43 @@ export default function Vote() {
         </select>
       </div>
 
+      {!wallet && (
+        <div className="bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-800/60 rounded-3xl p-6 mb-8 shadow-xl">
+          <h3 className="text-xl font-bold text-cyan-400 mb-2 flex items-center gap-2">
+            <FaWallet /> Wallet Connection Required
+          </h3>
+          {!window.ethereum && isMobileDevice() ? (
+            <>
+              <p className="text-slate-300 text-sm leading-relaxed mb-4">
+                To cast your vote on a mobile device, please open this app inside the <strong>MetaMask Mobile App</strong> built-in Web3 browser.
+              </p>
+              <a
+                href={getMetaMaskDeepLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
+              >
+                <FaWallet />
+                Open in MetaMask App
+              </a>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-300 text-sm leading-relaxed mb-4">
+                Please connect your Ethereum wallet to verify your identity on the blockchain and cast your vote.
+              </p>
+              <button
+                onClick={connect}
+                className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
+              >
+                <FaWallet />
+                Connect Wallet Now
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {hasVotedInSelected && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-3xl p-6 mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -770,6 +890,26 @@ export default function Vote() {
                 >
                   Election in Draft Phase
                 </button>
+              ) : !wallet ? (
+                !window.ethereum && isMobileDevice() ? (
+                  <a
+                    href={getMetaMaskDeepLink()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+                  >
+                    <FaWallet />
+                    Open MetaMask
+                  </a>
+                ) : (
+                  <button
+                    onClick={connect}
+                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+                  >
+                    <FaWallet />
+                    Connect Wallet
+                  </button>
+                )
               ) : (
                 <button
                   onClick={() => requestVoteOtp(candidate.candidateId)}
@@ -793,9 +933,24 @@ export default function Vote() {
       </div>
 
       {pendingVoteCandidateId && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-6 z-50">
-          <div className="w-full max-w-md bg-slate-900 rounded-3xl p-6 border border-slate-700 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-4 text-cyan-400">Verify Vote OTP</h2>
+        <div 
+          className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleVoiceCancel();
+          }}
+        >
+          <div className="w-full max-w-md bg-slate-900 rounded-3xl p-6 border border-slate-700 shadow-2xl relative">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-cyan-400 font-sans">Verify Vote OTP</h2>
+              <button
+                type="button"
+                onClick={handleVoiceCancel}
+                disabled={Boolean(loadingCandidateId)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <FaTimes size={20} />
+              </button>
+            </div>
 
             <form onSubmit={submitVerifiedVote}>
               <input
