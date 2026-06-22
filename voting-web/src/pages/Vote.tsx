@@ -14,6 +14,7 @@ import {
 } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
 import { normalizeStatus } from "../utils/normalizeStatus";
+import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from "@web3modal/ethers/react";
 
 interface Candidate {
   candidateId: string;
@@ -63,6 +64,10 @@ export default function Vote() {
 
   const { showToast } = useToast();
 
+  const { open } = useWeb3Modal();
+  const { address: modalAddress, isConnected: modalIsConnected } = useWeb3ModalAccount();
+  const { walletProvider } = useWeb3ModalProvider();
+
   const getMetaMaskDeepLink = () => {
     const host = window.location.host;
     const path = window.location.pathname + window.location.search;
@@ -72,72 +77,22 @@ export default function Vote() {
 
   const connect = async () => {
     try {
-      if (!window.ethereum) {
-        showToast("MetaMask is not installed. Please install MetaMask.", "warning");
-        return;
-      }
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-      if (accounts && accounts.length > 0) {
-        const address = accounts[0];
-        setWallet(address);
-        localStorage.setItem("walletAddress", address);
-        
-        const role = localStorage.getItem("role");
-        if (role === "Voter") {
-          await api.post(
-            `/users/connect-wallet?ethAddress=${encodeURIComponent(address)}`
-          );
-        }
-        showToast("Wallet Connected Successfully", "success");
-      }
+      await open();
     } catch (error: any) {
       console.error(error);
-      showToast(error?.response?.data?.message || "Failed to connect wallet", "error");
+      showToast("Failed to connect wallet", "error");
     }
   };
 
   useEffect(() => {
-    const checkWalletConnected = async () => {
-      if (window.ethereum) {
-        try {
-          const accounts: string[] = await window.ethereum.request({
-            method: "eth_accounts",
-          });
-          if (accounts && accounts.length > 0) {
-            setWallet(accounts[0]);
-            localStorage.setItem("walletAddress", accounts[0]);
-          } else {
-            setWallet("");
-            localStorage.removeItem("walletAddress");
-          }
-        } catch (err) {
-          console.error("Error checking accounts:", err);
-        }
-      } else {
-        setWallet("");
-      }
-    };
-
-    checkWalletConnected();
-
-    if (window.ethereum) {
-      const handleAccounts = (accounts: string[]) => {
-        if (accounts.length > 0) {
-          setWallet(accounts[0]);
-          localStorage.setItem("walletAddress", accounts[0]);
-        } else {
-          setWallet("");
-          localStorage.removeItem("walletAddress");
-        }
-      };
-      window.ethereum.on("accountsChanged", handleAccounts);
-      return () => {
-        window.ethereum.removeListener("accountsChanged", handleAccounts);
-      };
+    if (modalIsConnected && modalAddress) {
+      setWallet(modalAddress);
+      localStorage.setItem("walletAddress", modalAddress);
+    } else {
+      setWallet("");
+      localStorage.removeItem("walletAddress");
     }
-  }, []);
+  }, [modalAddress, modalIsConnected]);
   const [sendingOtpCandidateId, setSendingOtpCandidateId] = useState("");
   const [pendingVoteCandidateId, setPendingVoteCandidateId] = useState("");
   const [otp, setOtp] = useState("");
@@ -413,8 +368,8 @@ export default function Vote() {
     if (!pendingVoteCandidateId) return;
 
     try {
-      if (!window.ethereum) {
-        showToast("Please install MetaMask to vote.", "warning");
+      if (!walletProvider) {
+        showToast("Please connect your wallet to vote.", "warning");
         return;
       }
 
@@ -440,7 +395,7 @@ export default function Vote() {
         return;
       }
 
-      let provider = new ethers.BrowserProvider(window.ethereum);
+      let provider = new ethers.BrowserProvider(walletProvider as any);
       let signer = await provider.getSigner();
       let network = await provider.getNetwork();
       let chainId = Number(network.chainId);
@@ -450,18 +405,18 @@ export default function Vote() {
 
       if (chainId !== targetChainId) {
         try {
-          await window.ethereum.request({
+          await (walletProvider as any).request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: targetChainIdHex }],
           });
-          provider = new ethers.BrowserProvider(window.ethereum);
+          provider = new ethers.BrowserProvider(walletProvider as any);
           signer = await provider.getSigner();
           network = await provider.getNetwork();
           chainId = Number(network.chainId);
         } catch (switchError: any) {
           if (switchError.code === 4902) {
             try {
-              await window.ethereum.request({
+              await (walletProvider as any).request({
                 method: "wallet_addEthereumChain",
                 params: [
                   {
@@ -477,12 +432,12 @@ export default function Vote() {
                   },
                 ],
               });
-              provider = new ethers.BrowserProvider(window.ethereum);
+              provider = new ethers.BrowserProvider(walletProvider as any);
               signer = await provider.getSigner();
               network = await provider.getNetwork();
               chainId = Number(network.chainId);
             } catch (addError) {
-              showToast("Failed to add Sepolia network to MetaMask.", "error");
+              showToast("Failed to add Sepolia network to your wallet.", "error");
               return;
             }
           } else {

@@ -12,13 +12,13 @@ export const getVotingContract = async (contractAddress: string) => {
     throw new Error("Contract address is required");
   }
 
-  if (!window.ethereum) {
+  if (!(window as any).ethereum) {
     throw new Error(
       "MetaMask is not installed. Please install the MetaMask extension."
     );
   }
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
+  const provider = new ethers.BrowserProvider((window as any).ethereum);
   const signer = await provider.getSigner();
 
   return new ethers.Contract(contractAddress, VotingABI.abi, signer);

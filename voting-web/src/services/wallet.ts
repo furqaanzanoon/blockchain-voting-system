@@ -1,13 +1,7 @@
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
-
 export const connectWallet =
   async (): Promise<string | null> => {
     try {
-      if (!window.ethereum) {
+      if (!(window as any).ethereum) {
         console.warn(
           "MetaMask is not installed.\nPlease install MetaMask extension."
         );
@@ -16,7 +10,7 @@ export const connectWallet =
       }
 
       const accounts =
-        await window.ethereum.request({
+        await ((window as any).ethereum).request({
           method:
             "eth_requestAccounts",
         });

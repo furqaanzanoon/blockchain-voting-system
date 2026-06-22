@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { clearSession } from "../utils/session";
+import { useWeb3Modal, useWeb3ModalAccount, useDisconnect } from "@web3modal/ethers/react";
 
 import {
   FaVoteYea,
@@ -32,11 +33,6 @@ const ChangePassword = React.lazy(() => import("./ChangePassword"));
 const PendingUsers = React.lazy(() => import("./PendingUsers"));
 const Parties = React.lazy(() => import("./Parties"));
 
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
 
 type DashboardPage =
   | "elections"
@@ -56,6 +52,10 @@ const isMobileDevice = () => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+
+  const { open } = useWeb3Modal();
+  const { address: modalAddress, isConnected: modalIsConnected } = useWeb3ModalAccount();
+  const { disconnect } = useDisconnect();
 
   const getMetaMaskDeepLink = () => {
     const host = window.location.host;
@@ -222,84 +222,31 @@ export default function Dashboard() {
     }
   };
 
-  // Check blockchain (MetaMask) connectivity
+  // Sync WalletConnect / Web3Modal connection with local states
   useEffect(() => {
-    const checkBlockchain = async () => {
-      try {
-        if (!window.ethereum) {
-          setBlockchainStatus({
-            ok: false,
-            label: "No Wallet",
-            sub: "Install MetaMask",
-          });
-          return;
-        }
-
-        const accounts: string[] = await window.ethereum.request({
-          method: "eth_accounts",
-        });
-
-        if (accounts && accounts.length > 0) {
-          const address = accounts[0];
-          setBlockchainStatus({
-            ok: true,
-            label: "Connected",
-            sub: `${address.slice(0, 6)}...${address.slice(-4)}`,
-          });
-          if (walletRef.current !== address) {
-            setWallet(address);
-            localStorage.setItem("walletAddress", address);
-          }
-        } else {
-          setBlockchainStatus({
-            ok: true,
-            label: "Ready",
-            sub: "Wallet Not Connected",
-          });
-          if (walletRef.current !== "") {
-            setWallet("");
-            localStorage.removeItem("walletAddress");
-          }
-        }
-      } catch {
-        setBlockchainStatus({
-          ok: false,
-          label: "Error",
-          sub: "Wallet Check Failed",
-        });
+    if (modalIsConnected && modalAddress) {
+      setWallet(modalAddress);
+      localStorage.setItem("walletAddress", modalAddress);
+      setBlockchainStatus({
+        ok: true,
+        label: "Connected",
+        sub: `${modalAddress.slice(0, 6)}...${modalAddress.slice(-4)}`,
+      });
+      // Register with backend if Voter
+      if (role === "Voter") {
+        api.post(`/users/connect-wallet?ethAddress=${encodeURIComponent(modalAddress)}`)
+          .catch(err => console.error("Error registering address on connect:", err));
       }
-    };
-
-    checkBlockchain();
-
-    if (window.ethereum) {
-      const handleAccounts = (accounts: string[]) => {
-        if (accounts.length > 0) {
-          const address = accounts[0];
-          setWallet(address);
-          localStorage.setItem("walletAddress", address);
-          setBlockchainStatus({
-            ok: true,
-            label: "Connected",
-            sub: `${address.slice(0, 6)}...${address.slice(-4)}`,
-          });
-        } else {
-          setWallet("");
-          localStorage.removeItem("walletAddress");
-          setBlockchainStatus({
-            ok: true,
-            label: "Ready",
-            sub: "Wallet Not Connected",
-          });
-        }
-      };
-
-      window.ethereum.on("accountsChanged", handleAccounts);
-      return () => {
-        window.ethereum.removeListener("accountsChanged", handleAccounts);
-      };
+    } else {
+      setWallet("");
+      localStorage.removeItem("walletAddress");
+      setBlockchainStatus({
+        ok: true,
+        label: "Ready",
+        sub: "Wallet Not Connected",
+      });
     }
-  }, []);
+  }, [modalAddress, modalIsConnected, role]);
 
   // Check API health
   useEffect(() => {
@@ -325,79 +272,25 @@ export default function Dashboard() {
 
   const connect = async () => {
     try {
-      if (!window.ethereum) {
-        showToast(
-          "MetaMask is not installed. Please install MetaMask.",
-          "warning"
-        );
-        return;
-      }
-
-      const accounts =
-        await window.ethereum.request({
-          method:
-            "eth_requestAccounts",
-        });
-
-      if (
-        accounts &&
-        accounts.length > 0
-      ) {
-        const address = accounts[0];
-        setWallet(address);
-        localStorage.setItem(
-          "walletAddress",
-          address
-        );
-
-        if (role === "Voter") {
-          await api.post(
-            `/users/connect-wallet?ethAddress=${encodeURIComponent(
-              address
-            )}`
-          );
-        }
-
-        showToast(
-          "Wallet Connected Successfully",
-          "success"
-        );
-      }
+      await open();
     } catch (error: any) {
       console.error(error);
-      showToast(
-        error?.response?.data
-          ?.message ||
-          "Failed to connect wallet",
-        "error"
-      );
+      showToast("Failed to connect wallet", "error");
     }
   };
 
   const disconnectWallet = async () => {
     try {
-      // Revoke MetaMask permissions so it fully disconnects
-      if (window.ethereum) {
-        await window.ethereum.request({
-          method: "wallet_revokePermissions",
-          params: [
-            { eth_accounts: {} },
-          ],
-        });
-      }
-    } catch (err) {
-      // Some wallets don't support revokePermissions, that's okay
-      console.warn(
-        "wallet_revokePermissions not supported:",
-        err
-      );
+      await disconnect();
+      setWallet("");
+      localStorage.removeItem("walletAddress");
+      showToast("Wallet Disconnected", "info");
+    } catch (err: any) {
+      console.warn("Disconnect error:", err);
+      setWallet("");
+      localStorage.removeItem("walletAddress");
+      showToast("Wallet Disconnected", "info");
     }
-
-    setWallet("");
-    localStorage.removeItem(
-      "walletAddress"
-    );
-    showToast("Wallet Disconnected", "info");
   };
 
   const logout = () => {
