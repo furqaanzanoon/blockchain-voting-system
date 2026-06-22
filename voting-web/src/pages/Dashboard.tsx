@@ -45,10 +45,6 @@ type DashboardPage =
   | "parties"
   | "pending-users";
 
-const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -56,13 +52,6 @@ export default function Dashboard() {
   const { open } = useWeb3Modal();
   const { address: modalAddress, isConnected: modalIsConnected } = useWeb3ModalAccount();
   const { disconnect } = useDisconnect();
-
-  const getMetaMaskDeepLink = () => {
-    const host = window.location.host;
-    const path = window.location.pathname + window.location.search;
-    const cleanUrl = `${host}${path}`.replace(/^https?:\/\//, '');
-    return `https://metamask.app.link/dapp/${cleanUrl}`;
-  };
 
   const [page, setPage] =
     useState<DashboardPage>(
@@ -464,25 +453,13 @@ export default function Dashboard() {
             {role === "Voter" && (
               <>
                 {!wallet ? (
-                  !window.ethereum && isMobileDevice() ? (
-                    <a
-                      href={getMetaMaskDeepLink()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-500 text-black font-bold transition duration-200 justify-center"
-                    >
-                      <FaWallet />
-                      Open MetaMask Browser
-                    </a>
-                  ) : (
-                    <button
-                      onClick={connect}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-500 text-black font-bold transition duration-200"
-                    >
-                      <FaWallet />
-                      Connect Wallet
-                    </button>
-                  )
+                  <button
+                    onClick={connect}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-500 text-black font-bold transition duration-200"
+                  >
+                    <FaWallet />
+                    Connect Wallet
+                  </button>
                 ) : (
                   <button
                     onClick={
@@ -611,23 +588,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {role === "Voter" && !window.ethereum && isMobileDevice() && (
+        {role === "Voter" && !wallet && (
           <div className="bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-800/60 rounded-3xl p-6 mb-8 shadow-xl">
             <h2 className="text-xl font-bold text-cyan-400 mb-2 flex items-center gap-2">
-              <FaWallet /> Mobile Wallet Connection Guide
+              <FaWallet /> Wallet Connection Required
             </h2>
             <p className="text-slate-300 text-sm leading-relaxed mb-4">
-              To vote or connect your wallet on a mobile device, please open this website inside the <strong>MetaMask Mobile App</strong> built-in Web3 browser.
+              Please connect your Ethereum wallet to verify your identity on the blockchain and manage your voting actions.
             </p>
-            <a
-              href={getMetaMaskDeepLink()}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={connect}
               className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
             >
               <FaWallet />
-              Open in MetaMask App
-            </a>
+              Connect Wallet Now
+            </button>
           </div>
         )}
 

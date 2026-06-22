@@ -51,10 +51,6 @@ const normalizeElection = (e: any): Election => ({
   contractAddress: e.contractAddress ?? e.ContractAddress ?? "",
 });
 
-const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
-
 export default function Vote() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [elections, setElections] = useState<Election[]>([]);
@@ -67,13 +63,6 @@ export default function Vote() {
   const { open } = useWeb3Modal();
   const { address: modalAddress, isConnected: modalIsConnected } = useWeb3ModalAccount();
   const { walletProvider } = useWeb3ModalProvider();
-
-  const getMetaMaskDeepLink = () => {
-    const host = window.location.host;
-    const path = window.location.pathname + window.location.search;
-    const cleanUrl = `${host}${path}`.replace(/^https?:\/\//, '');
-    return `https://metamask.app.link/dapp/${cleanUrl}`;
-  };
 
   const connect = async () => {
     try {
@@ -619,35 +608,16 @@ export default function Vote() {
           <h3 className="text-xl font-bold text-cyan-400 mb-2 flex items-center gap-2">
             <FaWallet /> Wallet Connection Required
           </h3>
-          {!window.ethereum && isMobileDevice() ? (
-            <>
-              <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                To cast your vote on a mobile device, please open this app inside the <strong>MetaMask Mobile App</strong> built-in Web3 browser.
-              </p>
-              <a
-                href={getMetaMaskDeepLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
-              >
-                <FaWallet />
-                Open in MetaMask App
-              </a>
-            </>
-          ) : (
-            <>
-              <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                Please connect your Ethereum wallet to verify your identity on the blockchain and cast your vote.
-              </p>
-              <button
-                onClick={connect}
-                className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
-              >
-                <FaWallet />
-                Connect Wallet Now
-              </button>
-            </>
-          )}
+          <p className="text-slate-300 text-sm leading-relaxed mb-4">
+            Please connect your Ethereum wallet to verify your identity on the blockchain and cast your vote.
+          </p>
+          <button
+            onClick={connect}
+            className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-5 py-3 rounded-2xl transition duration-200 text-sm shadow-lg shadow-cyan-500/20"
+          >
+            <FaWallet />
+            Connect Wallet Now
+          </button>
         </div>
       )}
 
@@ -846,25 +816,13 @@ export default function Vote() {
                   Election in Draft Phase
                 </button>
               ) : !wallet ? (
-                !window.ethereum && isMobileDevice() ? (
-                  <a
-                    href={getMetaMaskDeepLink()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-                  >
-                    <FaWallet />
-                    Open MetaMask
-                  </a>
-                ) : (
-                  <button
-                    onClick={connect}
-                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-                  >
-                    <FaWallet />
-                    Connect Wallet
-                  </button>
-                )
+                <button
+                  onClick={connect}
+                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+                >
+                  <FaWallet />
+                  Connect Wallet
+                </button>
               ) : (
                 <button
                   onClick={() => requestVoteOtp(candidate.candidateId)}
