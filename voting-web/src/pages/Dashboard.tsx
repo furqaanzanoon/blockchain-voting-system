@@ -131,6 +131,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (role) {
       loadStats();
+      const interval = setInterval(loadStats, 5000);
+      return () => clearInterval(interval);
     }
   }, [role]);
 

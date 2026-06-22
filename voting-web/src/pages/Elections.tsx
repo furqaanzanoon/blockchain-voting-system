@@ -70,6 +70,8 @@ export default function Elections() {
 
   useEffect(() => {
     fetchElections();
+    const interval = setInterval(fetchElections, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const createElection = async () => {

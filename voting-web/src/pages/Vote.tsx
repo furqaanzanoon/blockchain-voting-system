@@ -215,11 +215,15 @@ export default function Vote() {
 
   useEffect(() => {
     loadElections();
+    const interval = setInterval(loadElections, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (selectedElection) {
       loadCandidates(selectedElection);
+      const interval = setInterval(() => loadCandidates(selectedElection), 5000);
+      return () => clearInterval(interval);
     }
   }, [selectedElection]);
 
@@ -242,7 +246,12 @@ export default function Vote() {
       setElections(list);
 
       if (list.length > 0) {
-        setSelectedElection(list[0].electionId);
+        setSelectedElection((prev) => {
+          if (prev && list.some((e) => e.electionId === prev)) {
+            return prev;
+          }
+          return list[0].electionId;
+        });
       } else {
         setSelectedElection("");
         setCandidates([]);
@@ -276,6 +285,17 @@ export default function Vote() {
   }, [selectedElection, hasVotedInSelected]);
 
   const fetchVoteReceipt = async (electionId: string) => {
+    const userId = localStorage.getItem("userId") || "anonymous";
+    const cachedReceipt = localStorage.getItem(`voter_receipt_${userId}_${electionId}`);
+    if (cachedReceipt) {
+      try {
+        setVoteReceipt(JSON.parse(cachedReceipt));
+        return;
+      } catch (err) {
+        console.error("Error parsing cached receipt:", err);
+      }
+    }
+
     try {
       setLoadingReceipt(true);
       const res = await api.get(`/vote/receipt/${electionId}`);
@@ -451,14 +471,17 @@ export default function Vote() {
 
       const responseData = voteRes.data;
       if (responseData?.txHash) {
-        setVoteReceipt({
+        const receipt = {
           txHash: responseData.txHash,
           blockNumber: responseData.blockNumber,
           votedAt: new Date().toISOString(),
           candidateName: currentCandidate?.candidateName ?? "",
           electionTitle: currentElection?.title ?? "",
           contractAddress: currentElection?.contractAddress ?? "",
-        });
+        };
+        setVoteReceipt(receipt);
+        const userId = localStorage.getItem("userId") || "anonymous";
+        localStorage.setItem(`voter_receipt_${userId}_${selectedElection}`, JSON.stringify(receipt));
       }
 
       showToast("Vote cast successfully! Verified on-chain.", "success");
@@ -579,85 +602,126 @@ export default function Vote() {
                 🔗 Blockchain Vote Receipt
               </h4>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                  <span className="text-slate-400 font-medium min-w-[120px]">Transaction:</span>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <code className="text-green-400 text-xs break-all">
-                      {voteReceipt.txHash}
-                    </code>
-                    <a
-                      href={`https://sepolia.etherscan.io/tx/${voteReceipt.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 transition-colors"
-                      title="View on Etherscan"
-                    >
-                      <FaExternalLinkAlt size={12} />
-                    </a>
+              {voteReceipt.txHash ? (
+                <>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                      <span className="text-slate-400 font-medium min-w-[120px]">Transaction:</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <code className="text-green-400 text-xs break-all">
+                          {voteReceipt.txHash}
+                        </code>
+                        <a
+                          href={`https://sepolia.etherscan.io/tx/${voteReceipt.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 transition-colors"
+                          title="View on Etherscan"
+                        >
+                          <FaExternalLinkAlt size={12} />
+                        </a>
+                      </div>
+                    </div>
+
+                    {voteReceipt.blockNumber && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Block:</span>
+                        <a
+                          href={`https://sepolia.etherscan.io/block/${voteReceipt.blockNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                        >
+                          #{voteReceipt.blockNumber}
+                        </a>
+                      </div>
+                    )}
+
+                    {voteReceipt.candidateName && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Voted For:</span>
+                        <span className="text-white font-semibold">{voteReceipt.candidateName}</span>
+                      </div>
+                    )}
+
+                    {voteReceipt.votedAt && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Voted At:</span>
+                        <span className="text-slate-300">
+                          {new Date(voteReceipt.votedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+                        </span>
+                      </div>
+                    )}
+
+                    {voteReceipt.contractAddress && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Contract:</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <code className="text-slate-300 text-xs break-all">
+                            {voteReceipt.contractAddress}
+                          </code>
+                          <a
+                            href={`https://sepolia.etherscan.io/address/${voteReceipt.contractAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 transition-colors"
+                            title="View contract on Etherscan"
+                          >
+                            <FaExternalLinkAlt size={12} />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${voteReceipt.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
+                  >
+                    <FaExternalLinkAlt size={12} />
+                    Verify on Etherscan
+                  </a>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs leading-relaxed">
+                    <strong>Ballot Secrecy Enabled:</strong> Your vote has been verified on-chain. To protect your privacy, your candidate choice and transaction hash are not stored on our servers and are only available on the device you voted from.
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                      <span className="text-slate-400 font-medium min-w-[120px]">Status:</span>
+                      <span className="text-emerald-400 font-semibold">Recorded On-Chain</span>
+                    </div>
+                    {voteReceipt.electionTitle && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Election:</span>
+                        <span className="text-white">{voteReceipt.electionTitle}</span>
+                      </div>
+                    )}
+                    {voteReceipt.contractAddress && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                        <span className="text-slate-400 font-medium min-w-[120px]">Contract:</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <code className="text-slate-300 text-xs break-all">
+                            {voteReceipt.contractAddress}
+                          </code>
+                          <a
+                            href={`https://sepolia.etherscan.io/address/${voteReceipt.contractAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 transition-colors"
+                            title="View contract on Etherscan"
+                          >
+                            <FaExternalLinkAlt size={12} />
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {voteReceipt.blockNumber && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                    <span className="text-slate-400 font-medium min-w-[120px]">Block:</span>
-                    <a
-                      href={`https://sepolia.etherscan.io/block/${voteReceipt.blockNumber}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-cyan-400 hover:text-cyan-300 transition-colors"
-                    >
-                      #{voteReceipt.blockNumber}
-                    </a>
-                  </div>
-                )}
-
-                {voteReceipt.candidateName && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                    <span className="text-slate-400 font-medium min-w-[120px]">Voted For:</span>
-                    <span className="text-white font-semibold">{voteReceipt.candidateName}</span>
-                  </div>
-                )}
-
-                {voteReceipt.votedAt && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                    <span className="text-slate-400 font-medium min-w-[120px]">Voted At:</span>
-                    <span className="text-slate-300">
-                      {new Date(voteReceipt.votedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-                    </span>
-                  </div>
-                )}
-
-                {voteReceipt.contractAddress && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                    <span className="text-slate-400 font-medium min-w-[120px]">Contract:</span>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <code className="text-slate-300 text-xs break-all">
-                        {voteReceipt.contractAddress}
-                      </code>
-                      <a
-                        href={`https://sepolia.etherscan.io/address/${voteReceipt.contractAddress}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-cyan-400 hover:text-cyan-300 flex-shrink-0 transition-colors"
-                        title="View contract on Etherscan"
-                      >
-                        <FaExternalLinkAlt size={12} />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <a
-                href={`https://sepolia.etherscan.io/tx/${voteReceipt.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-2 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
-              >
-                <FaExternalLinkAlt size={12} />
-                Verify on Etherscan
-              </a>
+              )}
             </div>
           )}
         </div>

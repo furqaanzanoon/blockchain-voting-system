@@ -79,8 +79,6 @@ namespace VotingAPI.Services
             try
             {
                 voter.HasVoted = true;
-                voter.TxHash = txHash;
-                voter.BlockNumber = blockNumber;
                 await dbContext.VoteTransactions.AddAsync(voteTransaction);
                 await dbContext.SaveChangesAsync();
                 await dbTransaction.CommitAsync();
@@ -121,20 +119,15 @@ namespace VotingAPI.Services
                 .Include(v => v.Election)
                 .FirstOrDefaultAsync(v => v.UserId == userId && v.ElectionId == electionId);
 
-            if (voter == null || !voter.HasVoted || string.IsNullOrEmpty(voter.TxHash))
+            if (voter == null || !voter.HasVoted)
                 return null;
-
-            // Use the actual vote timestamp from the VoteTransaction table (not registration time)
-            var voteTransaction = await dbContext.VoteTransactions
-                .Include(vt => vt.Candidate)
-                .FirstOrDefaultAsync(vt => vt.TxHash == voter.TxHash && vt.ElectionId == electionId);
 
             return new VoteReceiptDTO
             {
-                TxHash = voter.TxHash,
-                BlockNumber = voter.BlockNumber,
-                VotedAt = voteTransaction?.VotedAt ?? voter.RegisteredAt,
-                CandidateName = voteTransaction?.Candidate?.Name ?? "Unknown Candidate",
+                TxHash = string.Empty,
+                BlockNumber = 0,
+                VotedAt = voter.RegisteredAt,
+                CandidateName = "Anonymous (Ballot Secret)",
                 ElectionTitle = voter.Election.Title,
                 ContractAddress = voter.Election.ContractAddress ?? string.Empty
             };
@@ -222,8 +215,6 @@ namespace VotingAPI.Services
             try
             {
                 voter.HasVoted = true;
-                voter.TxHash = confirmVoteDTO.TxHash;
-                voter.BlockNumber = confirmVoteDTO.BlockNumber;
                 await dbContext.VoteTransactions.AddAsync(voteTransaction);
                 await dbContext.SaveChangesAsync();
 
@@ -285,8 +276,6 @@ namespace VotingAPI.Services
             var (txHash, blockNumber) = await blockchainService.VerifyZkVoteAsync(proof, signals);
 
             voter.HasVoted = true;
-            voter.TxHash = txHash;
-            voter.BlockNumber = blockNumber;
 
             var voteTransaction = new VoteTransaction
             {
