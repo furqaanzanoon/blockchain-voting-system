@@ -1,29 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
-    </linearGradient>
     <linearGradient id="chain" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#22d3ee"/>
       <stop offset="100%" stop-color="#0ea5e9"/>
     </linearGradient>
   </defs>
 
-  <!-- Background rounded square -->
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-
   <!-- Chain block left -->
-  <rect x="3" y="12" width="9" height="8" rx="2" stroke="url(#chain)" stroke-width="1.8" fill="none"/>
+  <rect x="2" y="11" width="10" height="10" rx="2.5" stroke="url(#chain)" stroke-width="2.2" fill="none"/>
   <!-- Chain link connector -->
-  <rect x="11.5" y="14.5" width="9" height="3" rx="1.5" fill="url(#chain)"/>
+  <rect x="11.5" y="14" width="9" height="4" rx="2" fill="url(#chain)"/>
   <!-- Chain block right -->
-  <rect x="20" y="12" width="9" height="8" rx="2" stroke="url(#chain)" stroke-width="1.8" fill="none"/>
+  <rect x="20" y="11" width="10" height="10" rx="2.5" stroke="url(#chain)" stroke-width="2.2" fill="none"/>
 
-  <!-- Code brackets < > -->
-  <path d="M8 6 L5 8.5 L8 11" stroke="#22d3ee" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M13 6 L16 8.5 L13 11" stroke="#0ea5e9" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-
-  <!-- Tick / checkmark for vote -->
-  <path d="M19 22 L22 25.5 L28 20" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Green vote checkmark below -->
+  <path d="M9 25 L13 29 L23 21" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
