@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { startSession } from "../utils/session";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 type LoginRole =
   | "Voter"
@@ -41,6 +42,7 @@ const getClaim = (
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  usePageTitle("Login");
 
   const [email, setEmail] =
     useState("");

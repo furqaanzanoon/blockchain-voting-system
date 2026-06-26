@@ -1,4 +1,5 @@
 import React, { useEffect, useState, Suspense } from "react";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useToast } from "../context/ToastContext";
@@ -58,6 +59,20 @@ export default function Dashboard() {
       "elections"
     );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const pageTitleMap: Record<DashboardPage, string> = {
+    elections: "Elections",
+    candidates: "Candidates",
+    vote: "Cast Your Vote",
+    results: "Election Results",
+    officers: "Election Officers",
+    voters: "Voters",
+    "change-password": "Change Password",
+    parties: "Parties",
+    "pending-users": "Pending Approvals",
+  };
+
+  usePageTitle(pageTitleMap[page]);
 
   const handlePageChange = (p: DashboardPage) => {
     setPage(p);

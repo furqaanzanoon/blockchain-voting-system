@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useToast } from "../context/ToastContext";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 export default function Register() {
+  usePageTitle("Create Account");
   const navigate = useNavigate();
   const { showToast } = useToast();
 
