@@ -22,7 +22,7 @@ contract BallotFactory {
     uint256 public ballotCount;
 
     address public immutable registryAddress;
-    address public immutable zkVerifierAddress;
+
 
     event BallotCreated(
         uint256 indexed ballotId,
@@ -31,9 +31,8 @@ contract BallotFactory {
         string title
     );
 
-    constructor(address _registryAddress, address _zkVerifierAddress) {
+    constructor(address _registryAddress) {
         registryAddress = _registryAddress;
-        zkVerifierAddress = _zkVerifierAddress;
     }
 
     function createBallot(
@@ -42,7 +41,7 @@ contract BallotFactory {
     ) external returns (uint256) {
         require(_candidateNames.length >= 2, "At least 2 candidates required");
 
-        Voting newVoting = new Voting(registryAddress, zkVerifierAddress);
+        Voting newVoting = new Voting(registryAddress);
 
         uint256 len = _candidateNames.length;
         for (uint256 i = 0; i < len;) {

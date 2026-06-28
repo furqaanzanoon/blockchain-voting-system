@@ -13,7 +13,7 @@ contract Voting {
     // ─── State ───────────────────────────────────────────────
     address public owner;
     bool public votingOpen;
-    address public zkVerifier;
+
 
     VoterRegistry public registry;
 
@@ -47,10 +47,9 @@ contract Voting {
     }
 
     // ─── Constructor ─────────────────────────────────────────
-    constructor(address _registry, address _zkVerifier) {
+    constructor(address _registry) {
         owner = msg.sender;
         registry = VoterRegistry(_registry);
-        zkVerifier = _zkVerifier;
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),

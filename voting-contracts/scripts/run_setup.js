@@ -28,8 +28,7 @@ async function main() {
   // 6. Export verification key to JSON
   runCmd("npx snarkjs zkey export verificationkey circuits/vote_final.zkey circuits/verification_key.json");
   
-  // 7. Export Solidity verifier contract to ZKVerifier.sol
-  runCmd("npx snarkjs zkey export solidityverifier circuits/vote_final.zkey contracts/security/ZKVerifier.sol");
+
   
   console.log("Setup complete! Cleaning up temporary ceremony files...");
   
@@ -39,7 +38,7 @@ async function main() {
   fs.unlinkSync("pot13_final.ptau");
   fs.unlinkSync("circuits/vote_0000.zkey");
   
-  console.log("Solidity verifier generated at: contracts/security/ZKVerifier.sol");
+
   console.log("Verification key generated at: circuits/verification_key.json");
   console.log("Proving key generated at: circuits/vote_final.zkey");
 }

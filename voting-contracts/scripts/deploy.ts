@@ -65,29 +65,6 @@ async function main() {
 
   await delay(5000);
 
-  // =====================================================
-  // Deploy ZKVerifier
-  // =====================================================
-
-  const ZKVerifier =
-    await ethers.getContractFactory(
-      "ZKVerifier"
-    );
-
-  const zkVerifier =
-    await ZKVerifier.deploy();
-
-  await zkVerifier.waitForDeployment();
-
-  const zkVerifierAddress =
-    await zkVerifier.getAddress();
-
-  console.log(
-    "ZKVerifier deployed to:",
-    zkVerifierAddress
-  );
-
-  await delay(5000);
 
   // =====================================================
   // Deploy VoterRegistry
@@ -126,8 +103,7 @@ async function main() {
 
   const ballotFactory =
     await BallotFactory.deploy(
-      registryAddress,
-      zkVerifierAddress
+      registryAddress
     );
 
   await ballotFactory.waitForDeployment();
@@ -175,7 +151,7 @@ async function main() {
   console.log("\n========== DEPLOYMENT SUMMARY ==========");
 
   console.log("AccessControl:", accessControlAddress);
-  console.log("ZKVerifier:", zkVerifierAddress);
+
   console.log("VoterRegistry:", registryAddress);
   console.log("BallotFactory:", ballotFactoryAddress);
   console.log("ResultAggregator:", aggregatorAddress);
@@ -198,7 +174,6 @@ async function main() {
     appsettings.BlockchainSettings = {
       ...appsettings.BlockchainSettings,
       AccessControlAddress: accessControlAddress,
-      ZKVerifierAddress: zkVerifierAddress,
       VoterRegistryAddress: registryAddress,
       BallotFactoryAddress: ballotFactoryAddress,
       ResultAggregatorAddress: aggregatorAddress,
@@ -237,10 +212,7 @@ async function main() {
       /(name="BlockchainSettings__AccessControlAddress"\s+value=")[^"]*(")/,
       `$1${accessControlAddress}$2`
     );
-    content = content.replace(
-      /(name="BlockchainSettings__ZKVerifierAddress"\s+value=")[^"]*(")/,
-      `$1${zkVerifierAddress}$2`
-    );
+
     content = content.replace(
       /(name="BlockchainSettings__VoterRegistryAddress"\s+value=")[^"]*(")/,
       `$1${registryAddress}$2`
