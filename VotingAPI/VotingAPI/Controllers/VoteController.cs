@@ -49,55 +49,5 @@ namespace VotingAPI.Controllers
             return Ok(new { message = result });
         }
 
-        [Authorize(Roles = nameof(UserRole.Voter))]
-        [HttpPost("confirm")]
-        public async Task<IActionResult> ConfirmVote([FromBody] ConfirmVoteDTO confirmVoteDTO)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Not logged in");
-
-            await voteService.ConfirmVote(Guid.Parse(userId!), confirmVoteDTO);
-            return Ok(new { message = "Vote stored successfully" });
-        }
-
-        [Authorize(Roles = nameof(UserRole.Voter))]
-        [HttpGet("receipt/{electionId:guid}")]
-        public async Task<IActionResult> GetVoteReceipt(Guid electionId)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Not logged in");
-
-            var receipt = await voteService.GetVoteReceipt(Guid.Parse(userId!), electionId);
-            if (receipt == null)
-                return NotFound(new { message = "No vote found for this election" });
-
-            return Ok(receipt);
-        }
-
-        [Authorize(Roles = nameof(UserRole.Voter))]
-        [HttpPost("zk")]
-        public async Task<IActionResult> CastZkVote([FromBody] CastZkVoteDTO dto)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Not logged in");
-
-            var (txHash, blockNumber) = await voteService.CastZkVoteAsync(Guid.Parse(userId!), dto);
-            return Ok(new { txHash = txHash, blockNumber = blockNumber });
-        }
-
-        [Authorize(Roles = nameof(UserRole.Voter))]
-        [HttpPost("commitment")]
-        public async Task<IActionResult> RegisterVoterCommitment([FromBody] RegisterCommitmentDTO dto)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Not logged in");
-
-            var result = await voteService.RegisterVoterCommitment(dto.ElectionId, Guid.Parse(userId!), dto.Commitment);
-            return Ok(new { message = result });
-        }
-
-        [Authorize(Roles = $"{nameof(UserRole.Voter)},{nameof(UserRole.Admin)},{nameof(UserRole.ElectionOfficer)}")]
-        [HttpGet("commitments/{electionId:guid}")]
-        public async Task<IActionResult> GetElectionVoterCommitments(Guid electionId)
-        {
-            var result = await voteService.GetElectionVoterCommitments(electionId);
-            return Ok(result);
-        }
     }
 }

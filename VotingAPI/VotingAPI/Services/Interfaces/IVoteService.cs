@@ -8,16 +8,6 @@ namespace VotingAPI.Services.Interfaces
 
         Task<VotePrepareResponseDTO> PrepareVote(Guid userId, VotePrepareRequestDTO votePrepareRequestDTO);
 
-        Task ConfirmVote(Guid userId, ConfirmVoteDTO confirmVoteDTO);
-
         Task<(long Nonce, string RegisteredAddress)> GetVoterNonce(Guid userId, Guid electionId);
-
-        Task<VoteReceiptDTO?> GetVoteReceipt(Guid userId, Guid electionId);
-
-        Task<(string TxHash, long BlockNumber)> CastZkVoteAsync(Guid userId, CastZkVoteDTO castZkVoteDTO);
-
-        Task<string> RegisterVoterCommitment(Guid electionId, Guid userId, string commitment);
-
-        Task<List<string>> GetElectionVoterCommitments(Guid electionId);
     }
 }

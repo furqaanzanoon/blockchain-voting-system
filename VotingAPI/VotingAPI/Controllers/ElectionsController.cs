@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using VotingAPI.Models.DTOs.Election;
 using VotingAPI.Models.Enums;
-using VotingAPI.Services;
 using VotingAPI.Services.Interfaces;
 
 namespace VotingAPI.Controllers

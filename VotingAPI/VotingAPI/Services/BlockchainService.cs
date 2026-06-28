@@ -132,15 +132,6 @@ namespace VotingAPI.Services
             return results;
         }
 
-        public async Task<(string TxHash, long BlockNumber)> CastVoteAsync(string votingContractAddress, string voterAddress, int candidateIndex)
-        {
-            var votingService = new VotingService(web3, votingContractAddress);
-            var receipt = await votingService.VoteRequestAndWaitForReceiptAsync(voterAddress, candidateIndex);
-
-            cache.Remove($"ElectionResults_{votingContractAddress}");
-
-            return (receipt.TransactionHash, (long)receipt.BlockNumber.Value);
-        }
 
         public async Task<long> GetVoterNonceAsync(string votingContractAddress, string voterAddress)
         {
@@ -182,10 +173,5 @@ namespace VotingAPI.Services
             return (receipt.TransactionHash, (long)receipt.BlockNumber.Value);
         }
 
-        public async Task SetBallotRootAsync(System.Numerics.BigInteger ballotId, System.Numerics.BigInteger merkleRoot)
-        {
-            var zkVerifierService = new VotingAPI.Services.Blockchain.Generated.ZKVerifier.ZKVerifierService(web3, zkVerifierAddress);
-            await zkVerifierService.SetBallotRootRequestAndWaitForReceiptAsync(ballotId, merkleRoot);
-        }
     }
 }
