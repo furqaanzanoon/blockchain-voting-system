@@ -12,9 +12,5 @@ namespace VotingAPI.Services.Interfaces
         Task<List<CandidateResultDTO>> GetResultsAsync(string votingContractAddress);
         Task<long> GetVoterNonceAsync(string votingContractAddress, string voterAddress);
         Task<(string TxHash, long BlockNumber)> CastVoteWithSignatureAsync(string votingContractAddress, string voterAddress, int candidateIndex, long nonce, string signature);
-        Task<(string TxHash, long BlockNumber)> VerifyZkVoteAsync(
-            VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.Proof proof, 
-            VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.PublicSignals signals
-        );
     }
 }

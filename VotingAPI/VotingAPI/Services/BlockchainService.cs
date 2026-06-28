@@ -22,7 +22,7 @@ namespace VotingAPI.Services
         private readonly IMemoryCache cache;
         private readonly string adminWalletAddress;
         private readonly string accessControlAddress;
-        private readonly string zkVerifierAddress;
+
         private readonly string voterRegistryAddress;
         private readonly string ballotFactoryAddress;
         private readonly string resultAggregatorAddress;
@@ -35,7 +35,7 @@ namespace VotingAPI.Services
             adminWalletAddress = account.Address;
             web3 = new Web3(account, config["BlockchainSettings:NodeUrl"]);
             accessControlAddress = config["BlockchainSettings:AccessControlAddress"] ?? throw new InvalidOperationException("AccessControlAddress is missing");
-            zkVerifierAddress = config["BlockchainSettings:ZKVerifierAddress"] ?? throw new InvalidOperationException("ZKVerifierAddress is missing");
+
             voterRegistryAddress = config["BlockchainSettings:VoterRegistryAddress"] ?? throw new InvalidOperationException("VoterRegistryAddress is missing");
             ballotFactoryAddress = config["BlockchainSettings:BallotFactoryAddress"] ?? throw new ArgumentException("BallotFactoryAddress is missing");
             resultAggregatorAddress = config["BlockchainSettings:ResultAggregatorAddress"] ?? throw new ArgumentException("ResultAggregatorAddress is missing");
@@ -163,15 +163,7 @@ namespace VotingAPI.Services
             return (receipt.TransactionHash, (long)receipt.BlockNumber.Value);
         }
 
-        public async Task<(string TxHash, long BlockNumber)> VerifyZkVoteAsync(
-            VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.Proof proof, 
-            VotingAPI.Services.Blockchain.Generated.ZKVerifier.ContractDefinition.PublicSignals signals
-        )
-        {
-            var zkVerifierService = new VotingAPI.Services.Blockchain.Generated.ZKVerifier.ZKVerifierService(web3, zkVerifierAddress);
-            var receipt = await zkVerifierService.VerifyAndVoteRequestAndWaitForReceiptAsync(proof, signals);
-            return (receipt.TransactionHash, (long)receipt.BlockNumber.Value);
-        }
+
 
     }
 }
