@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { FaUserTie } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
+import { normalizeStatus } from "../utils/normalizeStatus";
 
 interface Candidate {
   candidateId: string;
@@ -24,13 +25,6 @@ interface CandidateUser {
   partyAffiliation?: string;
   email: string;
 }
-
-const normalizeStatus = (status: string | number) => {
-  if (typeof status === "number") {
-    return ["Draft", "Active", "Closed"][status] ?? "Draft";
-  }
-  return status;
-};
 
 export default function Candidates() {
   const role =

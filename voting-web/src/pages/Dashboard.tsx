@@ -90,11 +90,6 @@ export default function Dashboard() {
     });
   }, [page]);
   const [wallet, setWallet] = useState("");
-  const walletRef = React.useRef(wallet);
-
-  useEffect(() => {
-    walletRef.current = wallet;
-  }, [wallet]);
   const [userName, setUserName] =
     useState("");
   const [role, setRole] =

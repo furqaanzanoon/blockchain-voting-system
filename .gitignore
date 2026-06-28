@@ -7,6 +7,12 @@
 ## Publish output
 VotingAPI/VotingAPI/publish/
 VotingAPI/VotingAPI/publish.zip
+VotingAPI/VotingAPI/publish_deploy.zip
+VotingAPI/VotingAPI/publish_deploy_local.zip
+
+## Test flow scripts (local testing only)
+voting-web/test_flow.js
+voting-web/test_flow.cjs
 
 ## Visual Studio
 VotingAPI/.vs/

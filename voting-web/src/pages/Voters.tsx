@@ -2,19 +2,13 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { FaUserCheck } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
+import { normalizeStatus } from "../utils/normalizeStatus";
 
 interface Election {
   electionId: string;
   title: string;
   status: string | number;
 }
-
-const normalizeStatus = (status: string | number) => {
-  if (typeof status === "number") {
-    return ["Draft", "Active", "Closed"][status] ?? "Draft";
-  }
-  return status;
-};
 
 interface User {
   userId: string;

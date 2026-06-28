@@ -3,6 +3,7 @@ import api from "../services/api";
 import { FaCalendarAlt } from "react-icons/fa";
 import { formatToIST } from "../utils/formatIST";
 import { useToast } from "../context/ToastContext";
+import { normalizeStatus } from "../utils/normalizeStatus";
 
 interface Election {
   electionId: string;
@@ -15,20 +16,6 @@ interface Election {
   autoActivateFailReason: string | null;
   autoClose: boolean;
 }
-
-const normalizeStatus = (
-  status: Election["status"]
-) => {
-  if (typeof status === "number") {
-    return [
-      "Draft",
-      "Active",
-      "Closed",
-    ][status] ?? "Draft";
-  }
-
-  return status;
-};
 
 export default function Elections() {
   const role =
